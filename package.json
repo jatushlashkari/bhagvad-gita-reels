@@ -1,0 +1,33 @@
+{
+  "name": "bhagvad-gita-reels",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio video/index.ts",
+    "render:smoke": "remotion render video/index.ts GitaReel out/smoke.mp4 --props=fixtures/props-2-47.json --frames=0-15",
+    "generate": "tsx pipeline/run.ts",
+    "sources:build": "tsx scripts/build-sources.ts",
+    "assets": "tsx scripts/fetch-assets.ts",
+    "auth:youtube": "tsx scripts/youtube-auth.ts",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.505",
+    "@remotion/fonts": "^4.0.505",
+    "execa": "^9.6.1",
+    "googleapis": "^144.0.0",
+    "music-metadata": "^10.9.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "remotion": "^4.0.505"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "@types/react": "^19.2.18",
+    "tsx": "^4.23.5",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}

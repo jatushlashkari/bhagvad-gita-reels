@@ -1,0 +1,7 @@
+node_modules/
+out/
+public/generated/
+public/assets/backgrounds/
+public/assets/music/
+.env
+*.log
