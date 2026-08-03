@@ -1,0 +1,35 @@
+{
+  "verse": {
+    "book": "gita",
+    "ref": "gita:2:47",
+    "chapter": 2,
+    "verse": 47,
+    "sanskrit": [
+      "कर्मण्येवाधिकारस्ते मा फलेषु कदाचन।",
+      "मा कर्मफलहेतुर्भूर्मा ते सङ्गोऽस्त्वकर्मणि।।"
+    ],
+    "hindi": "कर्तव्य-कर्म करनेमें ही तेरा अधिकार है, फलोंमें कभी नहीं। अतः तू कर्मफलका हेतु भी मत बन और तेरी अकर्मण्यतामें भी आसक्ति न हो।",
+    "english": "Your right is only to work, but not to its results; do not let the results of action be your motive, nor let your attachment be to inaction.",
+    "attribution": {
+      "hindi": "Swami Ramsukhdas (github.com/gita/gita, Unlicense)",
+      "english": "Swami Sivananda (github.com/gita/gita, Unlicense)"
+    }
+  },
+  "timings": {
+    "titleSec": 2,
+    "shlokaStartSec": 2,
+    "shlokaSec": 8.13,
+    "meaningStartSec": 10.13,
+    "meaningSec": 14.8,
+    "englishStartSec": 24.93,
+    "englishSec": 6,
+    "outroStartSec": 30.93,
+    "outroSec": 4,
+    "totalSec": 35.63,
+    "introAudioStartSec": 2,
+    "meaningAudioStartSec": 10.13
+  },
+  "audio": { "introFile": null, "meaningFile": null },
+  "media": { "background": null, "music": null },
+  "brand": { "handle": "@yourhandle" }
+}
