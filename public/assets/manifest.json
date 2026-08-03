@@ -1,40 +1,40 @@
 {
   "backgrounds": [
     {
-      "file": "bg-ganga-aarti.webm",
+      "file": "bg-ganga-aarti.mp4",
       "url": "https://upload.wikimedia.org/wikipedia/commons/f/f5/Ganga_aarti_at_Varanasi.webm",
       "license": "CC0",
       "source": "https://commons.wikimedia.org/wiki/File:Ganga_aarti_at_Varanasi.webm"
     },
     {
-      "file": "bg-bromo-sunrise.webm",
+      "file": "bg-bromo-sunrise.mp4",
       "url": "https://upload.wikimedia.org/wikipedia/commons/a/aa/Mount_Bromo_HD_Timelapse_Movie_by_Justin_Ng.webm",
       "license": "CC BY 3.0",
       "source": "https://commons.wikimedia.org/wiki/File:Mount_Bromo_HD_Timelapse_Movie_by_Justin_Ng.webm",
       "credit": "Footage: Justin Ng (Wikimedia Commons, CC BY 3.0)"
     },
     {
-      "file": "bg-dawn-glow.webm",
+      "file": "bg-dawn-glow.mp4",
       "url": "https://upload.wikimedia.org/wikipedia/commons/1/14/Second_Glow_%28video%29.webm",
       "license": "CC BY 2.0",
       "source": "https://commons.wikimedia.org/wiki/File:Second_Glow_(video).webm",
       "credit": "Footage: John Fowler (Wikimedia Commons, CC BY 2.0)"
     },
     {
-      "file": "bg-canyon-dawn.webm",
+      "file": "bg-canyon-dawn.mp4",
       "url": "https://upload.wikimedia.org/wikipedia/commons/5/5d/Grand_Canyon_National_Park_timelapse_from_Yaki_Point.webm",
       "license": "Public domain",
       "source": "https://commons.wikimedia.org/wiki/File:Grand_Canyon_National_Park_timelapse_from_Yaki_Point.webm"
     },
     {
-      "file": "bg-lotus-pond.webm",
+      "file": "bg-lotus-pond.mp4",
       "url": "https://upload.wikimedia.org/wikipedia/commons/7/79/Timelapse_of_amazing_lotus_flowers_in_pond.webm",
       "license": "CC BY 3.0",
       "source": "https://commons.wikimedia.org/wiki/File:Timelapse_of_amazing_lotus_flowers_in_pond.webm",
       "credit": "Footage: Mike Seyfang (Wikimedia Commons, CC BY 3.0)"
     },
     {
-      "file": "bg-milky-way.webm",
+      "file": "bg-milky-way.mp4",
       "url": "https://upload.wikimedia.org/wikipedia/commons/9/92/Milky_Way_over_a_Joshua_tree_%2830865856965%29.webm",
       "license": "Public domain",
       "source": "https://commons.wikimedia.org/wiki/File:Milky_Way_over_a_Joshua_tree_(30865856965).webm"

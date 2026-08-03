@@ -1,6 +1,6 @@
 import { execa } from 'execa';
-import { parseFile } from 'music-metadata';
-import { mkdir } from 'node:fs/promises';
+import { parseBuffer } from 'music-metadata';
+import { mkdir, readFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 export const VOICE = 'hi-IN-MadhurNeural';
@@ -28,7 +28,8 @@ export async function synthHindi(
 ): Promise<{ path: string; durationSec: number }> {
   await mkdir(dirname(outPath), { recursive: true });
   await runEdgeTts(ttsArgs(text, outPath, opts));
-  const durationSec = (await parseFile(outPath)).format.duration ?? 0;
+  const buf = await readFile(outPath);
+  const durationSec = (await parseBuffer(buf, undefined, { duration: true })).format.duration ?? 0;
   if (durationSec < 0.5)
     throw new Error(`TTS produced suspicious duration ${durationSec}s for: ${text.slice(0, 40)}`);
   return { path: outPath, durationSec };

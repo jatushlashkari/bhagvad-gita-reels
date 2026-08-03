@@ -1,12 +1,28 @@
 import { createWriteStream, existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { execa } from 'execa';
+import ffmpegPath from 'ffmpeg-static';
 
 export type AssetEntry = { file: string; url: string; license: string; source: string; credit?: string };
 export type Manifest = { backgrounds: AssetEntry[]; music: AssetEntry[]; fonts: AssetEntry[] };
 
 const DIRS = { backgrounds: 'public/assets/backgrounds', music: 'public/assets/music' } as const;
 const UA = 'GitaReelsAssetFetcher/1.0 (https://github.com/; contact via repo)';
+
+// Source clips arrive as arbitrary-size VP9/4K; serving those to concurrent render tabs
+// starves the render server (fonts time out). Normalize once: 12s, 1080x1920 cover-crop,
+// 30fps H.264 — small files, cheap decode, deterministic look.
+export async function normalizeBackground(src: string, dest: string): Promise<void> {
+  await execa(ffmpegPath as unknown as string, [
+    '-y', '-i', src,
+    '-t', '12',
+    '-vf', 'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30',
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+    '-pix_fmt', 'yuv420p', '-an', '-movflags', '+faststart',
+    dest,
+  ]);
+}
 
 export function readManifest(): Manifest {
   return JSON.parse(readFileSync('public/assets/manifest.json', 'utf8'));
@@ -38,7 +54,15 @@ async function main(): Promise<void> {
       }
       process.stdout.write(`downloading ${e.file} ... `);
       try {
-        await download(e.url, dest);
+        if (kind === 'backgrounds') {
+          const raw = `${dest}.orig`;
+          await download(e.url, raw);
+          process.stdout.write('normalizing ... ');
+          await normalizeBackground(raw, dest);
+          unlinkSync(raw);
+        } else {
+          await download(e.url, dest);
+        }
         console.log('ok');
         downloaded++;
       } catch (err) {
