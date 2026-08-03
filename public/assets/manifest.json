@@ -1,0 +1,86 @@
+{
+  "backgrounds": [
+    {
+      "file": "bg-ganga-aarti.webm",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/f/f5/Ganga_aarti_at_Varanasi.webm",
+      "license": "CC0",
+      "source": "https://commons.wikimedia.org/wiki/File:Ganga_aarti_at_Varanasi.webm"
+    },
+    {
+      "file": "bg-bromo-sunrise.webm",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/a/aa/Mount_Bromo_HD_Timelapse_Movie_by_Justin_Ng.webm",
+      "license": "CC BY 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Mount_Bromo_HD_Timelapse_Movie_by_Justin_Ng.webm",
+      "credit": "Footage: Justin Ng (Wikimedia Commons, CC BY 3.0)"
+    },
+    {
+      "file": "bg-dawn-glow.webm",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/1/14/Second_Glow_%28video%29.webm",
+      "license": "CC BY 2.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Second_Glow_(video).webm",
+      "credit": "Footage: John Fowler (Wikimedia Commons, CC BY 2.0)"
+    },
+    {
+      "file": "bg-canyon-dawn.webm",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/5/5d/Grand_Canyon_National_Park_timelapse_from_Yaki_Point.webm",
+      "license": "Public domain",
+      "source": "https://commons.wikimedia.org/wiki/File:Grand_Canyon_National_Park_timelapse_from_Yaki_Point.webm"
+    },
+    {
+      "file": "bg-lotus-pond.webm",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/7/79/Timelapse_of_amazing_lotus_flowers_in_pond.webm",
+      "license": "CC BY 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Timelapse_of_amazing_lotus_flowers_in_pond.webm",
+      "credit": "Footage: Mike Seyfang (Wikimedia Commons, CC BY 3.0)"
+    },
+    {
+      "file": "bg-milky-way.webm",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/9/92/Milky_Way_over_a_Joshua_tree_%2830865856965%29.webm",
+      "license": "Public domain",
+      "source": "https://commons.wikimedia.org/wiki/File:Milky_Way_over_a_Joshua_tree_(30865856965).webm"
+    }
+  ],
+  "music": [
+    {
+      "file": "music-jalandhar.mp3",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/8/85/Jalandhar_%28ISRC_USUAN1400018%29.mp3",
+      "license": "CC BY 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Jalandhar_(ISRC_USUAN1400018).mp3",
+      "credit": "Music: Jalandhar - Kevin MacLeod (incompetech.com), CC BY 3.0"
+    },
+    {
+      "file": "music-vadodora.mp3",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/c/c3/Vadodora_%28ISRC_USUAN1400049%29.mp3",
+      "license": "CC BY 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Vadodora_(ISRC_USUAN1400049).mp3",
+      "credit": "Music: Vadodora - Kevin MacLeod (incompetech.com), CC BY 3.0"
+    },
+    {
+      "file": "music-meditation-02.mp3",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/0/09/Meditation_Impromptu_02_%28ISRC_USUAN1100162%29.mp3",
+      "license": "CC BY 3.0",
+      "source": "https://commons.wikimedia.org/wiki/File:Meditation_Impromptu_02_(ISRC_USUAN1100162).mp3",
+      "credit": "Music: Meditation Impromptu 02 - Kevin MacLeod (incompetech.com), CC BY 3.0"
+    }
+  ],
+  "fonts": [
+    {
+      "file": "NotoSerifDevanagari-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/main/fonts/NotoSerifDevanagari/hinted/ttf/NotoSerifDevanagari-Regular.ttf",
+      "license": "OFL-1.1",
+      "source": "https://github.com/notofonts/devanagari"
+    },
+    {
+      "file": "NotoSerifDevanagari-Bold.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/main/fonts/NotoSerifDevanagari/hinted/ttf/NotoSerifDevanagari-Bold.ttf",
+      "license": "OFL-1.1",
+      "source": "https://github.com/notofonts/devanagari"
+    },
+    {
+      "file": "NotoSerif-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/main/fonts/NotoSerif/hinted/ttf/NotoSerif-Regular.ttf",
+      "license": "OFL-1.1",
+      "source": "https://github.com/notofonts/latin-greek-cyrillic"
+    }
+  ]
+}
