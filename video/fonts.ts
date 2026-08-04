@@ -1,11 +1,11 @@
 import { loadFont } from '@remotion/fonts';
-import { staticFile } from 'remotion';
+import { DEVANAGARI_400, DEVANAGARI_700, LATIN_400 } from './fonts-embedded.ts';
 
 export const DEVANAGARI = 'NotoSerifDevanagari';
 export const LATIN = 'NotoSerif';
 
-// loadFont manages its own delayRender per font — no manual handle needed here.
-// (A manual module-level delayRender starved under heavy video-decode load.)
-loadFont({ family: DEVANAGARI, url: staticFile('assets/fonts/NotoSerifDevanagari-Regular.ttf'), weight: '400' });
-loadFont({ family: DEVANAGARI, url: staticFile('assets/fonts/NotoSerifDevanagari-Bold.ttf'), weight: '700' });
-loadFont({ family: LATIN, url: staticFile('assets/fonts/NotoSerif-Regular.ttf'), weight: '400' });
+// Fonts are embedded as data: URLs (see scripts/embed-fonts.ts) — loading them
+// involves no network/server fetch, which eliminated delayRender timeouts on CI.
+loadFont({ family: DEVANAGARI, url: DEVANAGARI_400, weight: '400', format: 'truetype' });
+loadFont({ family: DEVANAGARI, url: DEVANAGARI_700, weight: '700', format: 'truetype' });
+loadFont({ family: LATIN, url: LATIN_400, weight: '400', format: 'truetype' });

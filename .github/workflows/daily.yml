@@ -7,6 +7,10 @@ on:
       verse:
         description: 'Override ref, e.g. gita:2:47'
         required: false
+      dry_run:
+        description: 'Render only — post nothing (no secrets needed)'
+        type: boolean
+        default: false
 
 concurrency:
   group: daily-reel
@@ -45,11 +49,14 @@ jobs:
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
           GH_TOKEN: ${{ github.token }}
           VERSE_OVERRIDE: ${{ inputs.verse }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
+          FLAGS=""
+          [ "$DRY_RUN" = "true" ] && FLAGS="--dry-run"
           if [ -n "$VERSE_OVERRIDE" ]; then
-            npm run generate -- --verse "$VERSE_OVERRIDE"
+            npm run generate -- --verse "$VERSE_OVERRIDE" $FLAGS
           else
-            npm run generate
+            npm run generate -- $FLAGS
           fi
       - name: Save reel artifact (always — manual-posting fallback)
         if: always()
