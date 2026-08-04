@@ -3,7 +3,6 @@ import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, unlink
 import { readFile, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, normalize, resolve } from 'node:path';
-import { Readable } from 'node:stream';
 import { execa } from 'execa';
 import sharp from 'sharp';
 import { listBackgroundPool } from '../../shared/backgrounds.ts';
@@ -146,6 +145,15 @@ function errorText(e: unknown): string {
   return [err.stdout, err.stderr, err.message ?? String(e)].filter(Boolean).join('\n');
 }
 
+/** git's own stdout/stderr from a failed command, without execa's "Command failed with exit code
+ *  N: …" wrapper (which repeats the whole output a second time). Used only for the
+ *  nothing-to-commit no-op, where the sync as a whole succeeds and a "Command failed" line would
+ *  be actively misleading. Real failures still go through errorText() — nothing is hidden there. */
+function gitOutput(e: unknown): string {
+  const err = e as { stdout?: string; stderr?: string };
+  return [err.stdout, err.stderr].filter(Boolean).join('\n');
+}
+
 async function sync(): Promise<{ ok: boolean; output: string }> {
   const log: string[] = [];
   try {
@@ -160,10 +168,22 @@ async function sync(): Promise<{ ok: boolean; output: string }> {
       log.push(commit.stdout, commit.stderr);
     } catch (e) {
       const text = errorText(e);
-      if (!/nothing to commit/i.test(text)) throw e;
-      log.push(text, '(nothing to commit — skipping)');
+      // git phrases "nothing is staged" three different ways depending on what else is in the
+      // tree: "nothing to commit, working tree clean" (pristine), "no changes added to commit"
+      // (unstaged edits elsewhere), "nothing added to commit but untracked files present". This
+      // dashboard only ever stages public/assets, so all three mean the same no-op — matching
+      // only the first made a routine Sync report a red failure to anyone who happened to have an
+      // unrelated edit in flight, which is the normal state while working.
+      if (!/nothing to commit|no changes added to commit|nothing added to commit/i.test(text)) throw e;
+      // gitOutput, not text: this path ends in ok:true, so execa's "Command failed" wrapper would
+      // contradict the result. git's own message is kept — the UI shows this output verbatim.
+      log.push(gitOutput(e) || text, '(nothing to commit — skipping)');
     }
-    const push = await execa('git', ['push'], { cwd: REPO_ROOT });
+    // `-u origin HEAD` rather than a bare `git push`: a branch that has never been published has
+    // no upstream, and a bare push aborts with "no upstream branch" instead of syncing. This
+    // pushes the current branch to a like-named remote branch and records the upstream, so the
+    // first sync from a fresh branch works and every later one is a plain fast-forward push.
+    const push = await execa('git', ['push', '-u', 'origin', 'HEAD'], { cwd: REPO_ROOT });
     log.push(push.stdout, push.stderr);
     return { ok: true, output: log.filter(Boolean).join('\n') };
   } catch (e) {
@@ -189,10 +209,56 @@ function openMedia(rel: string): MediaHandle | null {
   return {
     size,
     type,
+    // Built by hand instead of via Readable.toWeb(), for the same reason generateStream guards
+    // every controller touch. A browser <video> routinely abandons a media request the moment it
+    // has the bytes it wants (the metadata probe, and every seek), which closes the response's
+    // stream controller while the file read is still in flight; toWeb()'s adapter then enqueues
+    // onto that dead controller and the resulting "Invalid state: Controller is already closed"
+    // TypeError escapes from a stream event handler as an uncaughtException. That is not
+    // hypothetical: one dashboard session with a 7-tile library and an inline player produced 12
+    // of them, every one immediately after a 206. Here each controller touch is try/catch'd, the
+    // first failure (or close/error) settles the stream for good, and the file descriptor is
+    // destroyed on cancel so an abandoned request stops reading instead of draining the file.
     stream(start, end) {
-      return Readable.toWeb(
-        createReadStream(abs, start === undefined ? undefined : { start, end }),
-      ) as ReadableStream<Uint8Array>;
+      const source = createReadStream(abs, start === undefined ? undefined : { start, end });
+      return new ReadableStream<Uint8Array>({
+        start(c) {
+          let settled = false;
+          const touch = (fn: () => void) => {
+            if (settled) return;
+            try {
+              fn();
+            } catch {
+              // Consumer tore the controller down (aborted request): stop reading, never touch
+              // the controller again.
+              settled = true;
+              source.destroy();
+            }
+          };
+          // The `string` arm is unreachable — createReadStream is opened without an encoding, so
+          // it only ever emits Buffers — but @types/node models the setEncoding() case in the
+          // same signature, and converting is cheaper than lying with a cast. Copying into a
+          // fresh Uint8Array (rather than enqueuing the Buffer itself) matches generateStream and
+          // avoids handing the consumer a view over Node's pooled buffer memory.
+          source.on('data', (chunk: string | Buffer) => {
+            touch(() => {
+              c.enqueue(typeof chunk === 'string' ? new TextEncoder().encode(chunk) : new Uint8Array(chunk));
+              // Backpressure, which Readable.toWeb() gave us for free: stop reading once the
+              // consumer's queue is full and wait for pull() below, so serving a 23 MB reel
+              // doesn't buffer the whole file in memory.
+              if (c.desiredSize !== null && c.desiredSize <= 0) source.pause();
+            });
+          });
+          source.on('end', () => touch(() => { c.close(); settled = true; }));
+          source.on('error', (e) => touch(() => { c.error(e); settled = true; }));
+        },
+        pull() {
+          source.resume();
+        },
+        cancel() {
+          source.destroy();
+        },
+      });
     },
   };
 }

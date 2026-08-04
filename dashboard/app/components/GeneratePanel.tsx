@@ -3,6 +3,20 @@ import { useEffect, useRef, useState } from 'react';
 
 const REEL_URL = '/api/media/out/reel.mp4';
 
+/** The generate route answers errors as `{ error }` JSON (400 bad ref/background, 409 lock), but
+ *  an unhandled server fault can still come back as plain text or HTML — read the body once and
+ *  surface whatever is actually there rather than assuming a shape. */
+async function errorDetail(res: Response): Promise<string> {
+  const text = await res.text().catch(() => '');
+  try {
+    const parsed = JSON.parse(text) as { error?: unknown };
+    if (typeof parsed?.error === 'string') return parsed.error;
+  } catch {
+    /* not JSON — fall through to the raw body */
+  }
+  return text.trim() || res.statusText || 'request failed';
+}
+
 const selectClass =
   'w-full rounded-lg border border-white/10 bg-[#0d0817] px-3 py-2 text-sm text-[#f5efe0] focus:border-[#e8c874]/60 focus:outline-none focus:ring-2 focus:ring-[#e8c874]/40';
 
@@ -51,8 +65,16 @@ export function GeneratePanel() {
 
   useEffect(() => { fetch('/api/state').then((r) => r.json()).then((s) => setChapters(s.chapters)); }, []);
   useEffect(() => { fetch('/api/assets').then((r) => r.json()).then(setAssets); }, []);
+  // Aborted on change so a slow response for an older ch/vs can't land after — and overwrite —
+  // the preview for the verse the user has since selected. Abort rejections are swallowed: the
+  // newer request owns the preview now, and there is nothing to report.
   useEffect(() => {
-    fetch(`/api/verse/${encodeURIComponent(`gita:${ch}:${vs}`)}`).then((r) => (r.ok ? r.json() : null)).then(setPreview);
+    const ac = new AbortController();
+    fetch(`/api/verse/${encodeURIComponent(`gita:${ch}:${vs}`)}`, { signal: ac.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setPreview)
+      .catch(() => {});
+    return () => ac.abort();
   }, [ch, vs]);
   // Additive to the effects above: the mount-only asset fetch would leave a just-uploaded image
   // missing from the background dropdown until a page reload, which breaks the design spec's §6
@@ -64,25 +86,39 @@ export function GeneratePanel() {
     return () => window.removeEventListener('assets-changed', reload);
   }, []);
 
+  const appendLog = (line: string) => setLog((l) => (l ? `${l}\n${line}` : line));
+
+  // Every exit path goes through `finally { setRunning(false) }`: a throw anywhere below (network
+  // drop, server restart mid-stream, a body that never arrives) used to leave `running` true
+  // forever, which sticks the button on "Rendering…" with no way back short of a reload. Errors
+  // are appended to the log rather than swallowed — design spec §5, failures show the real error.
   async function generate() {
     setRunning(true); setLog(''); setDone(null);
-    const res = await fetch('/api/generate', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ref: `gita:${ch}:${vs}`, background: bg || undefined }),
-    });
-    if (res.status === 409) { setLog('A render is already in progress.'); setRunning(false); setDone(false); return; }
-    const reader = res.body!.getReader();
-    const dec = new TextDecoder();
-    let all = '';
-    for (;;) {
-      const { value, done: d } = await reader.read();
-      if (d) break;
-      all += dec.decode(value, { stream: true });
-      setLog(all);
-      logRef.current?.scrollTo(0, 1e9);
+    try {
+      const res = await fetch('/api/generate', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ref: `gita:${ch}:${vs}`, background: bg || undefined }),
+      });
+      if (res.status === 409) { setLog('A render is already in progress.'); setDone(false); return; }
+      if (!res.ok) { appendLog(`HTTP ${res.status}: ${await errorDetail(res)}`); setDone(false); return; }
+      if (!res.body) { appendLog('The server sent no response body — nothing to stream.'); setDone(false); return; }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let all = '';
+      for (;;) {
+        const { value, done: d } = await reader.read();
+        if (d) break;
+        all += dec.decode(value, { stream: true });
+        setLog(all);
+        logRef.current?.scrollTo(0, 1e9);
+      }
+      setDone(/\nEXIT 0\n?$/.test(all));
+    } catch (e) {
+      appendLog(e instanceof Error ? e.message : String(e));
+      setDone(false);
+    } finally {
+      setRunning(false);
     }
-    setRunning(false);
-    setDone(/\nEXIT 0\n?$/.test(all));
   }
 
   const verseCount = chapters[ch - 1] ?? 1;
