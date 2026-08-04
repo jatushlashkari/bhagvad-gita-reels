@@ -5,7 +5,7 @@ import { execa } from 'execa';
 import ffmpegPath from 'ffmpeg-static';
 
 export type AssetEntry = { file: string; url: string; license: string; source: string; credit?: string };
-export type Manifest = { backgrounds: AssetEntry[]; music: AssetEntry[]; fonts: AssetEntry[] };
+export type Manifest = { backgrounds: AssetEntry[]; music: AssetEntry[]; fonts: AssetEntry[]; images: AssetEntry[] };
 
 const DIRS = { backgrounds: 'public/assets/backgrounds', music: 'public/assets/music' } as const;
 const UA = 'GitaReelsAssetFetcher/1.0 (https://github.com/; contact via repo)';

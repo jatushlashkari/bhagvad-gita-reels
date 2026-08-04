@@ -13,4 +13,8 @@ describe('parseArgs', () => {
   it('rejects malformed verse refs', () => {
     expect(() => parseArgs(['--verse', '2.47'])).toThrow(/format/);
   });
+
+  it('parses a background override', () => {
+    expect(parseArgs(['--background', 'krishna.jpg'])).toEqual({ dryRun: false, background: 'krishna.jpg' });
+  });
 });

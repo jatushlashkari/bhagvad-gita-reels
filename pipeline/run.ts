@@ -9,18 +9,22 @@ import { introText } from '../post/captions.ts';
 import { postYoutube } from '../post/youtube.ts';
 import { postInstagram } from '../post/instagram.ts';
 import { readManifest } from '../scripts/fetch-assets.ts';
+import { listBackgroundPool, resolveBackground } from '../shared/backgrounds.ts';
 import type { ReelProps, Timings, Verse } from '../shared/types.ts';
 
 const STATE_PATH = 'state.json';
 
-export function parseArgs(argv: string[]): { verse?: string; dryRun: boolean } {
+export function parseArgs(argv: string[]): { verse?: string; dryRun: boolean; background?: string } {
   const dryRun = argv.includes('--dry-run');
+  const bi = argv.indexOf('--background');
+  const background = bi === -1 ? undefined : argv[bi + 1];
+  if (bi !== -1 && !background) throw new Error('--background needs a file name');
   const vi = argv.indexOf('--verse');
-  if (vi === -1) return { dryRun };
+  if (vi === -1) return { dryRun, background };
   const verse = argv[vi + 1];
   if (!verse || !/^[a-z]+:\d+:\d+$/.test(verse))
     throw new Error(`--verse must have format book:chapter:verse (e.g. gita:2:47), got: ${verse ?? '(none)'}`);
-  return { verse, dryRun };
+  return { verse, dryRun, background };
 }
 
 function requireEnv(name: string): string {
@@ -103,11 +107,15 @@ async function main(): Promise<void> {
   }
 
   // 2. Deterministic background/music pick (gradient/silence fallback keeps renders unblocked).
-  const bgs = listAssets('public/assets/backgrounds', /\.(webm|mp4)$/i);
+  const pool = listBackgroundPool();
   const tracks = listAssets('public/assets/music', /\.mp3$/i);
-  if (bgs.length === 0) console.warn('no backgrounds downloaded — using gradient (run: npm run assets)');
-  if (tracks.length === 0) console.warn('no music downloaded — rendering without music (run: npm run assets)');
-  const bgFile = bgs.length ? pickAsset(verse.ref, bgs) : null;
+  if (pool.length === 0) console.warn('no backgrounds — using gradient (run: npm run assets)');
+  if (tracks.length === 0) console.warn('no music — rendering silent (run: npm run assets)');
+  const bgEntry = args.background
+    ? resolveBackground(args.background, pool)
+    : pool.length
+      ? resolveBackground(pickAsset(verse.ref, pool.map((p) => p.file)), pool)
+      : null;
   const musicFile = tracks.length ? pickAsset(verse.ref, tracks) : null;
 
   const props: ReelProps = {
@@ -115,7 +123,7 @@ async function main(): Promise<void> {
     timings,
     audio: { introFile: 'generated/intro.mp3', meaningFile: 'generated/meaning.mp3' },
     media: {
-      background: bgFile ? `assets/backgrounds/${bgFile}` : null,
+      background: bgEntry?.rel ?? null,
       music: musicFile ? `assets/music/${musicFile}` : null,
     },
     brand: { handle: config.handle },
@@ -127,7 +135,7 @@ async function main(): Promise<void> {
   const renderArgs = ['remotion', 'render', 'video/index.ts', 'GitaReel', 'out/reel.mp4', '--props=out/props.json'];
   if (process.env.REMOTION_VERBOSE) renderArgs.push('--log=verbose');
   await execa('npx', renderArgs, { stdio: 'inherit' });
-  console.log(`✔ rendered out/reel.mp4 (${timings.totalSec.toFixed(1)}s, bg=${bgFile ?? 'gradient'}, music=${musicFile ?? 'none'})`);
+  console.log(`✔ rendered out/reel.mp4 (${timings.totalSec.toFixed(1)}s, bg=${bgEntry?.file ?? 'gradient'}, music=${musicFile ?? 'none'})`);
 
   if (args.dryRun) {
     console.log('dry-run complete — nothing posted, state untouched.');
@@ -137,7 +145,7 @@ async function main(): Promise<void> {
   // 4. Attribution for CC BY assets rides along in the YouTube description.
   const manifest = readManifest();
   const credits = [
-    manifest.backgrounds.find((e) => e.file === bgFile)?.credit,
+    manifest.backgrounds.find((e) => e.file === bgEntry?.file)?.credit,
     manifest.music.find((e) => e.file === musicFile)?.credit,
   ].filter((c): c is string => Boolean(c));
 
