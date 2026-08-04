@@ -25,3 +25,9 @@ export function resolveBackground(name: string, pool: PoolEntry[]): PoolEntry {
   if (!hit) throw new Error(`background "${name}" not found; available: ${pool.map((p) => p.file).join(', ') || '(none)'}`);
   return hit;
 }
+
+export function kenBurnsVariant(seed: string): 0 | 1 | 2 | 3 {
+  let h = 0x811c9dc5;
+  for (const c of seed) { h ^= c.codePointAt(0)!; h = Math.imul(h, 0x01000193) >>> 0; }
+  return (h % 4) as 0 | 1 | 2 | 3;
+}

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdirSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { listBackgroundPool, resolveBackground } from './backgrounds.ts';
+import { listBackgroundPool, resolveBackground, kenBurnsVariant } from './backgrounds.ts';
 
 function fixtureRoot(): string {
   const root = mkdtempSync(join(tmpdir(), 'pool-'));
@@ -39,5 +39,17 @@ describe('resolveBackground', () => {
   it('throws with the available list', () => {
     const pool = listBackgroundPool(fixtureRoot());
     expect(() => resolveBackground('nope.jpg', pool)).toThrow(/available: .*a\.mp4/);
+  });
+});
+
+describe('kenBurnsVariant', () => {
+  it('is deterministic and in range', () => {
+    const v = kenBurnsVariant('gita:2:47:assets/images/k.jpg');
+    expect(v).toBe(kenBurnsVariant('gita:2:47:assets/images/k.jpg'));
+    expect([0, 1, 2, 3]).toContain(v);
+  });
+  it('varies across seeds', () => {
+    const vs = new Set(Array.from({ length: 40 }, (_, i) => kenBurnsVariant(`gita:1:${i}:x.jpg`)));
+    expect(vs.size).toBeGreaterThan(1);
   });
 });

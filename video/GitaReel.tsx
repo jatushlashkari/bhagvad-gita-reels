@@ -33,7 +33,7 @@ export const GitaReel: React.FC<ReelProps> = (p) => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#0d0817' }}>
-      <Background media={p.media} />
+      <Background media={p.media} seed={`${p.verse.ref}:${p.media.background ?? ''}`} />
       <TitleCard verse={p.verse} timings={p.timings} />
       <Sequence from={s(p.timings.shlokaStartSec)} durationInFrames={s(p.timings.shlokaSec)}>
         <Shloka lines={p.verse.sanskrit} timings={p.timings} />

@@ -83,5 +83,12 @@
       "source": "https://github.com/notofonts/latin-greek-cyrillic"
     }
   ],
-  "images": []
+  "images": [
+    {
+      "file": "sample-gradient.jpg",
+      "url": "",
+      "license": "Generated test asset",
+      "source": "scripts (ffmpeg gradient)"
+    }
+  ]
 }
