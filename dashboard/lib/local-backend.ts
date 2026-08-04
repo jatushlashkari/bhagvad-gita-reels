@@ -1,5 +1,7 @@
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { readFile, unlink, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { join, normalize, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { execa } from 'execa';
@@ -193,6 +195,43 @@ function openMedia(rel: string): MediaHandle | null {
       ) as ReadableStream<Uint8Array>;
     },
   };
+}
+
+const LOCK = () => join(REPO_ROOT, 'out/.render-lock');
+
+function acquireLock(): boolean {
+  mkdirSync(join(REPO_ROOT, 'out'), { recursive: true });
+  try {
+    const { startedAt } = JSON.parse(readFileSync(LOCK(), 'utf8'));
+    if (Date.now() - startedAt < 15 * 60 * 1000) return false; // fresh lock → busy
+  } catch { /* absent or corrupt → claimable */ }
+  writeFileSync(LOCK(), JSON.stringify({ pid: process.pid, startedAt: Date.now() }));
+  return true;
+}
+const releaseLock = () => { try { unlinkSync(LOCK()); } catch { /* already gone */ } };
+
+export function generateStream(ref: string, background?: string): ReadableStream<Uint8Array> | 'locked' {
+  if (!/^[a-z]+:\d+:\d+$/.test(ref)) throw new Error('bad ref');
+  if (!acquireLock()) return 'locked';
+  const args = ['tsx', 'pipeline/run.ts', '--verse', ref, '--dry-run', ...(background ? ['--background', background] : [])];
+  const proc = spawn('npx', args, {
+    cwd: REPO_ROOT,
+    env: { ...process.env, PATH: `${process.env.PATH}:${join(homedir(), '.local/bin')}` },
+  });
+  return new ReadableStream({
+    start(c) {
+      const push = (d: Buffer) => c.enqueue(new Uint8Array(d));
+      proc.stdout.on('data', push);
+      proc.stderr.on('data', push);
+      proc.on('close', (code) => {
+        releaseLock();
+        c.enqueue(new TextEncoder().encode(`\nEXIT ${code ?? 1}\n`));
+        c.close();
+      });
+      proc.on('error', (e) => { releaseLock(); c.enqueue(new TextEncoder().encode(`\n${e.message}\nEXIT 1\n`)); c.close(); });
+    },
+    cancel() { proc.kill('SIGTERM'); releaseLock(); },
+  });
 }
 
 export const localBackend: Backend = {
