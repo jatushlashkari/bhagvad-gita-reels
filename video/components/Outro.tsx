@@ -21,12 +21,24 @@ export const Outro: React.FC<{ brand: ReelProps['brand']; timings: Timings }> = 
           style={{
             fontFamily: DEVANAGARI,
             fontWeight: 700,
+            fontSize: 72,
+            color: '#e8c874',
+            textShadow: '0 2px 24px rgba(0,0,0,0.8)',
+            marginBottom: 12,
+          }}
+        >
+          ॐ
+        </div>
+        <div
+          style={{
+            fontFamily: DEVANAGARI,
+            fontWeight: 700,
             fontSize: 64,
             color: '#f5efe0',
             textShadow: '0 2px 24px rgba(0,0,0,0.8)',
           }}
         >
-          रोज़ एक श्लोक 🙏
+          रोज़ एक श्लोक
         </div>
         <div
           style={{

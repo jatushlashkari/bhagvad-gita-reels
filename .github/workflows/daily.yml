@@ -26,10 +26,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: npm }
-      - name: Install edge-tts and emoji font
-        run: |
-          pip install edge-tts
-          sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-color-emoji
+      - name: Install edge-tts
+        run: pip install edge-tts
       - uses: actions/cache@v4
         with:
           path: |
