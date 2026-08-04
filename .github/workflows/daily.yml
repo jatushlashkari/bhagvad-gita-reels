@@ -21,7 +21,9 @@ permissions:
 
 jobs:
   post:
-    runs-on: ubuntu-latest
+    # arm64 runner: 4 cores / 16 GB (free for public repos) — the 2-core x64 runner's
+    # render tab died of resource exhaustion late in every full-length render.
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -48,7 +50,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSE_OVERRIDE: ${{ inputs.verse }}
           DRY_RUN: ${{ inputs.dry_run }}
-          REMOTION_CONCURRENCY: '1' # one render tab on the 2-core runner — parallel tabs starve each other
+          REMOTION_CONCURRENCY: '2'
+          REMOTION_VERBOSE: '1' # extra render diagnostics in CI logs
         run: |
           FLAGS=""
           [ "$DRY_RUN" = "true" ] && FLAGS="--dry-run"

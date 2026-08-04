@@ -124,9 +124,9 @@ async function main(): Promise<void> {
   writeFileSync('out/props.json', JSON.stringify(props, null, 2));
 
   // 3. Render.
-  await execa('npx', ['remotion', 'render', 'video/index.ts', 'GitaReel', 'out/reel.mp4', '--props=out/props.json'], {
-    stdio: 'inherit',
-  });
+  const renderArgs = ['remotion', 'render', 'video/index.ts', 'GitaReel', 'out/reel.mp4', '--props=out/props.json'];
+  if (process.env.REMOTION_VERBOSE) renderArgs.push('--log=verbose');
+  await execa('npx', renderArgs, { stdio: 'inherit' });
   console.log(`✔ rendered out/reel.mp4 (${timings.totalSec.toFixed(1)}s, bg=${bgFile ?? 'gradient'}, music=${musicFile ?? 'none'})`);
 
   if (args.dryRun) {
