@@ -1,5 +1,8 @@
-import { AbsoluteFill, Video, interpolate, staticFile, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, Loop, OffthreadVideo, interpolate, staticFile, useCurrentFrame } from 'remotion';
 import { FPS, type ReelProps } from '../../shared/types.ts';
+
+// Every background is normalized to exactly 12s/30fps at fetch time (scripts/fetch-assets.ts).
+const BG_CLIP_FRAMES = 12 * FPS;
 
 export const Background: React.FC<{ media: ReelProps['media'] }> = ({ media }) => {
   const frame = useCurrentFrame();
@@ -8,12 +11,15 @@ export const Background: React.FC<{ media: ReelProps['media'] }> = ({ media }) =
   return (
     <AbsoluteFill>
       {media.background ? (
-        <Video
-          src={staticFile(media.background)}
-          muted
-          loop
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        />
+        // OffthreadVideo: frames are extracted by ffmpeg outside the browser —
+        // render tabs never decode video (in-browser decode starved 2-core CI runners).
+        <Loop durationInFrames={BG_CLIP_FRAMES}>
+          <OffthreadVideo
+            src={staticFile(media.background)}
+            muted
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        </Loop>
       ) : (
         <AbsoluteFill
           style={{

@@ -15,7 +15,7 @@ const UA = 'GitaReelsAssetFetcher/1.0 (https://github.com/; contact via repo)';
 // 30fps H.264 — small files, cheap decode, deterministic look.
 export async function normalizeBackground(src: string, dest: string): Promise<void> {
   await execa(ffmpegPath as unknown as string, [
-    '-y', '-i', src,
+    '-y', '-stream_loop', '-1', '-i', src, // loop short sources so output is always exactly 12s
     '-t', '12',
     '-vf', 'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30',
     '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',

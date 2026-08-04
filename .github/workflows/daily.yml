@@ -50,6 +50,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSE_OVERRIDE: ${{ inputs.verse }}
           DRY_RUN: ${{ inputs.dry_run }}
+          REMOTION_CONCURRENCY: '1' # one render tab on the 2-core runner — parallel tabs starve each other
         run: |
           FLAGS=""
           [ "$DRY_RUN" = "true" ] && FLAGS="--dry-run"
