@@ -11,7 +11,8 @@
     "assets": "tsx scripts/fetch-assets.ts",
     "auth:youtube": "tsx scripts/youtube-auth.ts",
     "test": "vitest run --passWithNoTests",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dashboard": "npm run dev --prefix dashboard"
   },
   "dependencies": {
     "@remotion/bundler": "^4.0.505",
