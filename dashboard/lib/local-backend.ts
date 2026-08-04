@@ -210,27 +210,108 @@ function acquireLock(): boolean {
 }
 const releaseLock = () => { try { unlinkSync(LOCK()); } catch { /* already gone */ } };
 
-export function generateStream(ref: string, background?: string): ReadableStream<Uint8Array> | 'locked' {
-  if (!/^[a-z]+:\d+:\d+$/.test(ref)) throw new Error('bad ref');
+// Basename only, matching the `--background <file>` contract (pipeline/run.ts resolves it
+// against the asset pool by exact file name): alnum/dot/underscore/hyphen, 1-200 chars, and never
+// leading with '-' (so it can't be misread as a CLI flag rather than a value, e.g. "--verse").
+// Empty/falsy background means "no override" (the Auto rotation) and is never passed here — see
+// the `background && ...` guard below, which mirrors the existing `background ? [...] : []` used
+// to build the child process args a few lines down.
+function isValidBackgroundName(name: string): boolean {
+  return /^[A-Za-z0-9._-]{1,200}$/.test(name) && !name.startsWith('-');
+}
+
+function generateStream(ref: string, background?: string): ReadableStream<Uint8Array> | 'locked' {
+  if (typeof ref !== 'string' || !/^[a-z]+:\d+:\d+$/.test(ref)) throw new Error('bad ref');
+  if (background && !isValidBackgroundName(background)) throw new Error('invalid background');
   if (!acquireLock()) return 'locked';
   const args = ['tsx', 'pipeline/run.ts', '--verse', ref, '--dry-run', ...(background ? ['--background', background] : [])];
   const proc = spawn('npx', args, {
     cwd: REPO_ROOT,
     env: { ...process.env, PATH: `${process.env.PATH}:${join(homedir(), '.local/bin')}` },
+    // `detached` makes `proc` the leader of its own process group instead of joining ours, so
+    // cancel() below can signal the *whole* group (npx -> tsx -> pipeline/run.ts -> the execa'd
+    // `npx remotion render` -> the remotion CLI -> its native compositor helper) with one call.
+    // Without this, killing only `proc` leaves that entire render tree running as orphans that
+    // keep the stdout/stderr pipes open — which means 'close' never fires, the lock never
+    // releases, and the render silently keeps consuming CPU/GPU forever (verified live: after
+    // `proc.kill('SIGTERM')` alone, `ps` still showed the remotion + compositor processes running
+    // minutes later, reparented to pid 1, with out/.render-lock still present).
+    detached: true,
   });
+
+  // The lock must be released exactly once, and only once the child process has actually,
+  // confirmedly exited (a 'close' or 'error' event) — never from cancel() itself. cancel() fires
+  // the instant a client disconnects, which races the OS's asynchronous delivery of SIGTERM and
+  // the process's own exit; releasing the lock right there let a canceled render's lock get
+  // reclaimed by a fresh generate, and then let the original (now-zombie) process's *later*
+  // close event delete that fresh render's lock out from under it — silently breaking the design
+  // spec's §5 "one render at a time" guarantee. `released` below guards the single real release;
+  // `canceled` stops the close/error handlers from ever touching a controller the consumer has
+  // already torn down (enqueue/close on it throws "Invalid state: Controller is already closed").
+  let canceled = false;
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    releaseLock();
+  };
+
   return new ReadableStream({
     start(c) {
-      const push = (d: Buffer) => c.enqueue(new Uint8Array(d));
+      // Belt-and-braces: every write path checks `canceled` AND is try/catch-guarded, so even an
+      // unanticipated ordering (e.g. a straggling 'data' event racing the teardown) can't throw
+      // an uncaught exception out of a child-process event handler and take the server down.
+      const push = (d: Buffer) => {
+        if (canceled) return;
+        try {
+          c.enqueue(new Uint8Array(d));
+        } catch { /* controller already torn down */ }
+      };
       proc.stdout.on('data', push);
       proc.stderr.on('data', push);
       proc.on('close', (code) => {
-        releaseLock();
-        c.enqueue(new TextEncoder().encode(`\nEXIT ${code ?? 1}\n`));
-        c.close();
+        release();
+        if (canceled) return;
+        try {
+          c.enqueue(new TextEncoder().encode(`\nEXIT ${code ?? 1}\n`));
+          c.close();
+        } catch { /* controller already torn down */ }
       });
-      proc.on('error', (e) => { releaseLock(); c.enqueue(new TextEncoder().encode(`\n${e.message}\nEXIT 1\n`)); c.close(); });
+      proc.on('error', (e) => {
+        release();
+        if (canceled) return;
+        try {
+          c.enqueue(new TextEncoder().encode(`\n${e.message}\nEXIT 1\n`));
+          c.close();
+        } catch { /* controller already torn down */ }
+      });
     },
-    cancel() { proc.kill('SIGTERM'); releaseLock(); },
+    cancel() {
+      // Do NOT release the lock here — see the comment above `canceled`/`released`. The
+      // close/error handler (which still fires after kill) is the only place that releases it.
+      canceled = true;
+      // Signal the whole process group (negative pid), not just `proc` itself — see the
+      // `detached` comment above for why a plain `proc.kill(...)` targeting only `proc` isn't
+      // enough to make the render tree actually exit (and thus isn't enough to make 'close' fire
+      // promptly). SIGINT, not SIGTERM: Remotion's CLI (node_modules/@remotion/cli/dist/
+      // cleanup-before-quit.js) only registers a graceful-shutdown handler for SIGINT (the same
+      // signal a Ctrl+C sends) — that handler is what closes its headless-Chrome render workers.
+      // SIGTERM has no such handler, so the CLI process dies immediately without running it,
+      // leaving those Chrome processes orphaned indefinitely (verified live: `proc.kill('SIGTERM')`
+      // released our lock but left 4 chrome-headless-shell processes running, reparented to pid 1,
+      // minutes later). npx/tsx have no SIGINT handler of their own, so they still terminate
+      // (Node's default disposition for an unhandled SIGINT is to exit) — only the one process
+      // that needs to run cleanup first actually gets the chance to.
+      if (proc.pid) {
+        try {
+          process.kill(-proc.pid, 'SIGINT');
+        } catch {
+          proc.kill('SIGINT'); // group already gone (e.g. process never fully started) — fall back
+        }
+      } else {
+        proc.kill('SIGINT');
+      }
+    },
   });
 }
 
@@ -242,4 +323,5 @@ export const localBackend: Backend = {
   getVerse,
   sync,
   openMedia,
+  generate: generateStream,
 };
