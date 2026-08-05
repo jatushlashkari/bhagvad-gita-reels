@@ -1,6 +1,9 @@
 import { getBackend, InvalidImageError } from '../../../lib/backend.ts';
+import { assertLocalOrigin } from '../../../lib/assert-local-origin.ts';
 
 export async function POST(req: Request) {
+  const rejected = assertLocalOrigin(req);
+  if (rejected) return rejected;
   const form = await req.formData();
   const f = form.get('file');
   if (!(f instanceof File)) return Response.json({ error: 'no file' }, { status: 400 });

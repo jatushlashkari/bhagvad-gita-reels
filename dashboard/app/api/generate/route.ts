@@ -1,4 +1,5 @@
 import { getBackend } from '../../../lib/backend.ts';
+import { assertLocalOrigin } from '../../../lib/assert-local-origin.ts';
 
 // Same shape the backend enforces (see local-backend.ts's isValidBackgroundName) — checked here
 // too so a bad value gets a precise 400 before ever reaching the backend/lock, matching the
@@ -11,6 +12,8 @@ function isValidBackground(background: unknown): background is string | undefine
 }
 
 export async function POST(req: Request) {
+  const rejected = assertLocalOrigin(req);
+  if (rejected) return rejected;
   let body: unknown;
   try {
     body = await req.json();

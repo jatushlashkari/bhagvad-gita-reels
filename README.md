@@ -31,7 +31,8 @@ npm test && npm run typecheck                    # checks
 A local control room for the pipeline — upload backgrounds, generate/preview any verse on demand, and push new backgrounds into the daily rotation, all from a browser instead of the CLI.
 
 ```bash
-npm run dashboard   # http://localhost:4000
+npm install --prefix dashboard   # one-time
+npm run dashboard                # http://localhost:4000
 ```
 
 On your phone, open the same URL with your Mac's LAN IP instead of `localhost` (e.g. `http://192.168.1.23:4000` — find it via System Settings → WiFi → Details, or `ipconfig getifaddr en0`), as long as the phone is on the same WiFi; the dev server listens on all interfaces.
