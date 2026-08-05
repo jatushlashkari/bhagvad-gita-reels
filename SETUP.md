@@ -95,3 +95,5 @@ open out/reel.mp4
 - GitHub emails you when a run fails. Open the run → download the **reel** artifact → post manually that day if you want.
 - Re-running a failed run is always safe: `state.json` guarantees nothing double-posts; only the missing platform is retried.
 - Instagram token refresh failing? Re-do step 3.5 to mint a fresh token, update the `IG_ACCESS_TOKEN` secret.
+
+Prefer a browser over the CLI for step 6? `npm run dashboard` gives you upload/generate/sync from http://localhost:4000 — see README's **Dashboard** section.

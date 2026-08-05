@@ -26,6 +26,22 @@ npm run assets                                   # fetch + normalize backgrounds
 npm test && npm run typecheck                    # checks
 ```
 
+## Dashboard
+
+A local control room for the pipeline — upload backgrounds, generate/preview any verse on demand, and push new backgrounds into the daily rotation, all from a browser instead of the CLI.
+
+```bash
+npm run dashboard   # http://localhost:4000
+```
+
+On your phone, open the same URL with your Mac's LAN IP instead of `localhost` (e.g. `http://192.168.1.23:4000` — find it via System Settings → WiFi → Details, or `ipconfig getifaddr en0`), as long as the phone is on the same WiFi; the dev server listens on all interfaces.
+
+- **Upload** a background image (jpg/png/webp, ≤15 MB) — it's resized to 1080×1920 and recorded as `"User-provided"` in `public/assets/manifest.json`, the same licensing ledger the CC0/CC BY footage uses.
+- **Generate** renders any verse on demand — optionally pinned to one background from the pool — with a live streaming log and a playable/downloadable result. It's a dry run: nothing is posted, `state.json` is untouched.
+- **Sync** commits the uploaded images + manifest and pushes, so the next scheduled run picks them up in its background rotation.
+
+Only one render runs at a time; a second Generate while one is in flight is rejected until the first finishes.
+
 ## Setup
 
 One-time platform setup (Meta app, Google OAuth, secrets): see **SETUP.md**.
