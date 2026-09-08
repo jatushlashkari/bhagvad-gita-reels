@@ -1,7 +1,7 @@
 # Krishna Vaani Format (v2) — Design Spec
 
 **Date:** 2026-08-05
-**Status:** Approved pending user review
+**Status:** SUPERSEDED by `2026-09-09-cinema-format-design.md` (never implemented — the cinema format serves the same reach goal with better reference data)
 **Goal:** A second, reach-optimized reel format — hook-first "श्रीकृष्ण कहते हैं" — driven by the same verse dataset and posting machinery, coexisting with the classic scripture-first format.
 
 ## 1. Why (from the 2026-08-04 research)
