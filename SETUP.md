@@ -41,6 +41,31 @@ On your phone: Instagram → Profile → ☰ → Settings and privacy → Accoun
 
 **Secrets produced:** `IG_USER_ID`, `IG_ACCESS_TOKEN`.
 
+## 3b. Facebook Page → Reels token
+
+Reels publishing reuses the Meta app from §3 — no new app needed, just a Facebook Page and one more product enabled on that app.
+
+1. If you don't already have one, create a Facebook Page from your personal Facebook account (any account can create one for free).
+2. In the same Meta app from §3 (developers.facebook.com/apps → your app), add the **Facebook Login for Business** product to the app.
+3. Open the **Graph API Explorer** (developers.facebook.com/tools/explorer), select your app, and click **Generate Access Token**. When prompted for permissions, grant `pages_manage_posts`, `pages_read_engagement`, and `publish_video`. Copy the resulting (short-lived) user token.
+4. Exchange it for a long-lived user token — the app's App ID and App Secret are on the app dashboard's basic settings page:
+
+```bash
+curl "https://graph.facebook.com/v23.0/oauth/access_token?grant_type=fb_exchange_token&client_id=<app id>&client_secret=<app secret>&fb_exchange_token=<token from step 3>"
+```
+
+5. Use that long-lived user token to list the Pages you manage — this single call returns both the Page ID and a Page access token:
+
+```bash
+curl "https://graph.facebook.com/v23.0/me/accounts?access_token=<long-lived token from step 4>"
+```
+
+Find your Page in the returned list: its `id` field is the Page ID, its `access_token` field is the Page token.
+
+Unlike the Instagram token, a Page token minted this way (from a long-lived user token) does not expire — there's no refresh workflow to maintain for Facebook.
+
+**Secrets produced:** `FB_PAGE_ID`, `FB_PAGE_ACCESS_TOKEN`.
+
 ## 4. Google Cloud → YouTube refresh token
 
 1. https://console.cloud.google.com → New project (name: `gita-reels`).
