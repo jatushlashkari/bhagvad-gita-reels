@@ -13,6 +13,7 @@ import {
 import { promptFor } from '../../../shared/prompts.ts';
 import { DEFAULT_STYLE, type ReelStyle } from '../../../shared/reel-style.ts';
 import type { ReelProps, Verse } from '../../../shared/types.ts';
+import { AddToCalendar } from '../components/calendar/AddToCalendar.tsx';
 import { BeatsEditor, beatsProblem } from '../components/studio/BeatsEditor.tsx';
 import { MediaControls, ROTATION_NOTE, type Asset } from '../components/studio/MediaControls.tsx';
 import { StyleControls } from '../components/studio/StyleControls.tsx';
@@ -563,7 +564,14 @@ export default function StudioPage() {
                 {log || 'starting…'}
               </pre>
             )}
-            {done === true && <ReelPlayer />}
+            {done === true && (
+              <>
+                <ReelPlayer />
+                {/* Only after a successful render: "Add to calendar" schedules the cut now sitting
+                    in out/, so offering it before one exists would archive someone else's reel. */}
+                <AddToCalendar sourceRef={ref} />
+              </>
+            )}
             {done === false && <p className="mt-3 text-sm text-red-400">failed — log above</p>}
           </section>
         </div>

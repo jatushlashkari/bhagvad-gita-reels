@@ -20,6 +20,12 @@ export default function Page() {
             Quotes →
           </Link>
           <Link
+            href="/calendar"
+            className="rounded-lg border border-[#e8c874]/40 px-3 py-1.5 text-sm text-[#e8c874] transition-colors hover:bg-[#e8c874]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e8c874]/60"
+          >
+            Calendar →
+          </Link>
+          <Link
             href="/studio"
             className="rounded-lg border border-[#e8c874]/40 px-3 py-1.5 text-sm text-[#e8c874] transition-colors hover:bg-[#e8c874]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e8c874]/60"
           >

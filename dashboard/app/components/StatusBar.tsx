@@ -1,5 +1,7 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { PLATFORMS, isoToLocal } from '../../../shared/schedule.ts';
+import type { CalendarView } from '../../lib/backend.ts';
 
 type State = {
   lastPosted: { ref: string; youtube?: string; instagram?: string } | null;
@@ -28,6 +30,7 @@ function Chip({ label, children }: { label: string; children: React.ReactNode })
 
 export function StatusBar() {
   const [state, setState] = useState<State | null>(null);
+  const [calendar, setCalendar] = useState<CalendarView | null>(null);
   const [sync, setSync] = useState<SyncResult | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [open, setOpen] = useState(false);
@@ -37,7 +40,27 @@ export function StatusBar() {
       .then((r) => r.json())
       .then(setState)
       .catch(() => setState(null));
+    // One extra read for one extra chip. A 500 (malformed schedule.json) leaves `calendar` null
+    // and the chip simply absent — /calendar is where that failure is worth explaining.
+    fetch('/api/calendar')
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setCalendar)
+      .catch(() => setCalendar(null));
   }, []);
+
+  // The earliest still-future post time across every row, in the calendar's own timezone.
+  // `scheduled` only: a skipped post will not go out and a published one already did, so counting
+  // either under a chip labelled "next scheduled" would be a promise the publisher never made.
+  const next = useMemo(() => {
+    if (calendar?.mode !== 'calendar') return null;
+    const now = Date.now();
+    const at = calendar.items
+      .flatMap((i) => PLATFORMS.map((p) => i.posts[p]))
+      .filter((p) => p.status === 'scheduled' && p.at !== null && Date.parse(p.at) > now)
+      .map((p) => Date.parse(p.at as string));
+    if (!at.length) return null;
+    return isoToLocal(new Date(Math.min(...at)).toISOString(), calendar.config.timezone);
+  }, [calendar]);
 
   async function runSync() {
     setSyncing(true);
@@ -54,6 +77,9 @@ export function StatusBar() {
   }
 
   const posted = state?.lastPosted;
+  // The chip belongs to calendar mode, not to having rows: in daily mode nothing here is
+  // scheduled at all, and an empty "next scheduled" would only invite the question.
+  const calendarMode = calendar?.mode === 'calendar';
 
   return (
     <section className="rounded-xl bg-[#161028] p-4 ring-1 ring-white/5">
@@ -69,7 +95,7 @@ export function StatusBar() {
         </button>
       </div>
 
-      <dl className="mt-3 grid gap-3 sm:grid-cols-3">
+      <dl className={`mt-3 grid gap-3 ${calendarMode ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'}`}>
         <Chip label="last posted">
           {posted ? (
             <>
@@ -98,6 +124,20 @@ export function StatusBar() {
         <Chip label="total posted">
           <span>{state ? state.totalPosted : '…'}</span>
         </Chip>
+        {calendarMode && (
+          <Chip label="next scheduled">
+            {next ? (
+              <>
+                <span className="text-[#e8c874]">{next.time}</span>
+                <span className="text-xs text-[#a89f8d]">
+                  {next.date} · {calendar?.config.timezone}
+                </span>
+              </>
+            ) : (
+              <span className="text-base text-[#a89f8d]">nothing scheduled</span>
+            )}
+          </Chip>
+        )}
       </dl>
 
       {sync && (
