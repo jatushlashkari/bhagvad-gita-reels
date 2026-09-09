@@ -15,7 +15,7 @@ import { postYoutube } from '../post/youtube.ts';
 import { postInstagram } from '../post/instagram.ts';
 import { readManifest } from '../scripts/fetch-assets.ts';
 import { listBackgroundPool, resolveBackground, type PoolEntry } from '../shared/backgrounds.ts';
-import { beatsFromTranslation } from '../shared/beats.ts';
+import { beatsFromTranslation, NO_EMOJI } from '../shared/beats.ts';
 import { DEFAULT_STYLE, validateStyle, type ReelStyle } from '../shared/reel-style.ts';
 import type { ReelProps, Timings, Verse } from '../shared/types.ts';
 
@@ -51,6 +51,25 @@ export function parseArgs(argv: string[]): RunArgs {
   return { verse, dryRun, background, format, overrides };
 }
 
+const MAX_OVERRIDE_BEATS = 6;
+const MAX_BEAT_LEN = 90;
+
+// --overrides is a CLI surface in its own right (not only the dashboard's
+// generated-form input), so a hand-edited or scripted overrides file gets the
+// same loud validation as sources/beats.json: a bad entry throws rather than
+// silently rendering broken/oversized/emoji text on screen.
+function assertValidOverrideBeat(beat: unknown): asserts beat is string {
+  if (typeof beat !== 'string') {
+    throw new Error(`override beat is not a string: ${JSON.stringify(beat)}`);
+  }
+  if (beat.length > MAX_BEAT_LEN) {
+    throw new Error(`override beat exceeds ${MAX_BEAT_LEN} chars: "${beat.slice(0, 40)}…"`);
+  }
+  if (NO_EMOJI.test(beat)) {
+    throw new Error(`override beat contains emoji: "${beat}"`);
+  }
+}
+
 /**
  * Pure merge core for the cinema pipeline's inputs: beats precedence
  * (overrides > curated > sentence-split fallback), style merge (preset
@@ -69,7 +88,17 @@ export function resolveCinemaInputs(
 ): { beats: string[]; style: ReelStyle; music: string | null; usedFallbackBeats: boolean } {
   void args; // reserved for future per-run beat/style overrides driven by CLI flags
 
-  const chosenBeats = ov?.beats ?? curated ?? null;
+  // An empty overrides.beats array signals "no opinion" (e.g. a cleared
+  // dashboard form field) rather than "render with zero beats" — treat it
+  // the same as an absent key and fall through to curated/fallback beats.
+  const overrideBeats = ov?.beats && ov.beats.length > 0 ? ov.beats : undefined;
+  if (overrideBeats) {
+    if (overrideBeats.length > MAX_OVERRIDE_BEATS) {
+      throw new Error(`override beats has ${overrideBeats.length} entries (max ${MAX_OVERRIDE_BEATS})`);
+    }
+    for (const beat of overrideBeats) assertValidOverrideBeat(beat);
+  }
+  const chosenBeats = overrideBeats ?? curated ?? null;
   const usedFallbackBeats = chosenBeats === null;
   const beats = chosenBeats ?? beatsFromTranslation(english);
 
@@ -78,7 +107,15 @@ export function resolveCinemaInputs(
 
   let music: string | null;
   if (ov && Object.prototype.hasOwnProperty.call(ov, 'music')) {
-    music = ov.music ?? null;
+    const overrideMusic = ov.music;
+    if (overrideMusic == null) {
+      music = null;
+    } else if (musicPool.includes(overrideMusic)) {
+      music = overrideMusic;
+    } else {
+      console.warn(`override music not found: ${overrideMusic} — rendering silent`);
+      music = null;
+    }
   } else if (style.musicMode === 'silent') {
     music = null;
   } else if (style.musicMode === 'track') {
@@ -91,6 +128,32 @@ export function resolveCinemaInputs(
   }
 
   return { beats, style, music, usedFallbackBeats };
+}
+
+/**
+ * Loads the cinema style preset from disk, defensively: an absent file is a
+ * normal "no preset yet" state (→ DEFAULT_STYLE), and unreadable/malformed
+ * JSON must never crash the daily pipeline run — it's logged and treated the
+ * same as absent. Only a file that parses to valid JSON is passed through
+ * validateStyle's field-level clamping/defaulting.
+ */
+export function loadStylePreset(path: string): ReelStyle {
+  if (!existsSync(path)) return DEFAULT_STYLE;
+  let raw: string;
+  try {
+    raw = readFileSync(path, 'utf8');
+  } catch (e) {
+    console.warn(`could not read style preset ${path} (${(e as Error).message}); using defaults`);
+    return DEFAULT_STYLE;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (e) {
+    console.warn(`malformed style preset ${path} (${(e as Error).message}); using defaults`);
+    return DEFAULT_STYLE;
+  }
+  return validateStyle(parsed);
 }
 
 function requireEnv(name: string): string {
@@ -168,10 +231,7 @@ async function main(): Promise<void> {
     const beatsFile = JSON.parse(readFileSync('sources/beats.json', 'utf8')) as Record<string, string[]>;
     const curated = beatsFile[verse.ref];
 
-    const presetPath = 'styles/cinema.json';
-    const preset = existsSync(presetPath)
-      ? validateStyle(JSON.parse(readFileSync(presetPath, 'utf8')))
-      : DEFAULT_STYLE;
+    const preset = loadStylePreset('styles/cinema.json');
 
     let ov: Overrides | null = null;
     if (args.overrides) {
