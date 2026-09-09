@@ -367,6 +367,8 @@ async function main(): Promise<void> {
   const failures: string[] = [];
   for (const platform of target.missing) {
     try {
+      if (platform === 'facebook')
+        throw new Error('facebook posting runs from the calendar publisher (config.mode "calendar"), not the daily pipeline');
       const id =
         platform === 'youtube'
           ? await postYoutube(

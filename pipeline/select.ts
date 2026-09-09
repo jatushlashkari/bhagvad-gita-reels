@@ -1,12 +1,15 @@
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import type { Verse } from '../shared/types.ts';
 
-export type PlatformKey = 'youtube' | 'instagram';
+// 'facebook' is published by the calendar publisher only — the daily pipeline refuses it
+// (see pipeline/run.ts) — but state.json is shared by both, so the key lives here.
+export type PlatformKey = 'youtube' | 'instagram' | 'facebook';
 
 export type PostedEntry = {
   ref: string;
   youtube?: { id: string; at: string };
   instagram?: { id: string; at: string };
+  facebook?: { id: string; at: string };
 };
 
 export type StateFile = { posted: PostedEntry[] };

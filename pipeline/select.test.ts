@@ -36,6 +36,16 @@ describe('pickNext', () => {
     const s: StateFile = { posted: [{ ref: 'gita:1:1', youtube: { id: 'y', at: 't' } }] };
     expect(pickNext(order, s, ['youtube'])?.ref).toBe('gita:1:2');
   });
+
+  it('treats facebook in platforms like the others', () => {
+    const s: StateFile = {
+      posted: [{ ref: 'gita:1:1', youtube: { id: 'y', at: 't' }, instagram: { id: 'i', at: 't' } }],
+    };
+    expect(pickNext(order, s, ['youtube', 'instagram', 'facebook'])).toEqual({
+      ref: 'gita:1:1',
+      missing: ['facebook'],
+    });
+  });
 });
 
 describe('recordPost', () => {
@@ -52,6 +62,12 @@ describe('recordPost', () => {
     expect(s2.posted).toHaveLength(1);
     expect(s2.posted[0].youtube?.id).toBe('y1');
     expect(s2.posted[0].instagram?.id).toBe('i1');
+  });
+
+  it('stores a facebook post (calendar mode publishes there too)', () => {
+    const s = recordPost({ posted: [] }, 'gita:1:1', 'facebook', 'f1', 't');
+    expect(s.posted[0]).toEqual({ ref: 'gita:1:1', facebook: { id: 'f1', at: 't' } });
+    expect(recordPost(s, 'gita:1:1', 'facebook', 'f2', 't2').posted[0].facebook).toEqual({ id: 'f2', at: 't2' });
   });
 });
 

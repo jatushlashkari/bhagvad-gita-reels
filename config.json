@@ -2,5 +2,11 @@
   "handle": "@yourhandle",
   "startRef": "gita:1:1",
   "platforms": ["youtube", "instagram"],
-  "format": "classic"
+  "format": "classic",
+  "mode": "calendar",
+  "schedule": {
+    "daysAhead": 3,
+    "defaultTimes": { "instagram": "07:00", "facebook": "07:05", "youtube": "07:10" },
+    "timezone": "Asia/Kolkata"
+  }
 }
