@@ -227,13 +227,15 @@ export function localToIso(date: string, time: string, tz: string): string {
   if (!YMD.test(date) || !HHMM.test(time)) throw new Error(`bad local time ${date} ${time}`);
   const [y, m, d] = date.split('-').map(Number);
   const [h, mi] = time.split(':').map(Number);
-  // Guess the instant as if the wall time were UTC, measure the zone's offset at that guess, correct once
-  // (a second pass catches a DST edge at the guess itself).
-  let guess = Date.UTC(y, m - 1, d, h, mi);
+  // Guess the instant as if the wall time were UTC, read the zone's wall time at that guess, and shift
+  // the guess by the difference from the REQUESTED wall time (never from the moving guess — comparing
+  // against the guess corrects a fixed-offset zone twice). A second pass catches a DST edge at the guess.
+  const target = Date.UTC(y, m - 1, d, h, mi);
+  let guess = target;
   for (let i = 0; i < 2; i++) {
     const p = partsIn(new Date(guess), tz);
     const asUtc = Date.UTC(p.y, p.m - 1, p.d, p.h, p.mi);
-    const diff = asUtc - guess;
+    const diff = asUtc - target;
     if (diff === 0) break;
     guess -= diff;
   }
