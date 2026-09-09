@@ -95,6 +95,36 @@
       "url": "",
       "license": "Generated test asset",
       "source": "scripts (ffmpeg gradient)"
+    },
+    {
+      "file": "seed-rrv-vasudev-krishna.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/6/6d/Vintage_Print_Vasudev_with_Child_Krishna_oleograph.jpg",
+      "license": "Public domain",
+      "source": "https://commons.wikimedia.org/wiki/File:Vintage_Print_Vasudev_with_Child_Krishna_oleograph.jpg"
+    },
+    {
+      "file": "seed-rrv-radha-moonlight.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/b/be/Radha_in_the_Moonlight.jpg",
+      "license": "Public domain",
+      "source": "https://commons.wikimedia.org/wiki/File:Radha_in_the_Moonlight.jpg"
+    },
+    {
+      "file": "seed-rrv-saraswati.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/d/df/Saraswati_by_Raja_Ravi_Varma.jpg",
+      "license": "Public domain",
+      "source": "https://commons.wikimedia.org/wiki/File:Saraswati_by_Raja_Ravi_Varma.jpg"
+    },
+    {
+      "file": "seed-rrv-lakshmi.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/a/a6/Raja_Ravi_Varma%2C_Goddess_Lakshmi%2C_1896.jpg",
+      "license": "Public domain",
+      "source": "https://commons.wikimedia.org/wiki/File:Raja_Ravi_Varma,_Goddess_Lakshmi,_1896.jpg"
+    },
+    {
+      "file": "seed-rrv-yashoda-krishna.jpg",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/3/31/Yashoda_with_Krishna%2C_Raja_Ravi_Varma.jpg",
+      "license": "Public domain",
+      "source": "https://commons.wikimedia.org/wiki/File:Yashoda_with_Krishna,_Raja_Ravi_Varma.jpg"
     }
   ]
 }
