@@ -28,6 +28,15 @@ export function readManifest(): Manifest {
   return JSON.parse(readFileSync('public/assets/manifest.json', 'utf8'));
 }
 
+/** User-provided uploads (dashboard saveImage/saveAudio, shared/assets-store.ts) are written
+ *  straight to disk and recorded in the manifest with `url: ''` — there is nothing to fetch.
+ *  Without this check the loop below calls `fetch('')`, which throws and gets counted as a
+ *  failed download, and a single synced music upload turns into a `process.exit(1)` that bricks
+ *  the daily CI run over an asset that was never meant to be fetched over the network. */
+export function shouldFetchAsset(entry: AssetEntry): boolean {
+  return entry.url !== '';
+}
+
 async function download(url: string, dest: string): Promise<void> {
   const res = await fetch(url, { headers: { 'User-Agent': UA } });
   if (!res.ok || !res.body) throw new Error(`HTTP ${res.status} for ${url}`);
@@ -43,11 +52,17 @@ async function main(): Promise<void> {
   const manifest = readManifest();
   let downloaded = 0;
   let cached = 0;
+  let skipped = 0;
   let failed = 0;
   for (const kind of ['backgrounds', 'music'] as const) {
     mkdirSync(DIRS[kind], { recursive: true });
     for (const e of manifest[kind]) {
       const dest = `${DIRS[kind]}/${e.file}`;
+      if (!shouldFetchAsset(e)) {
+        console.log(`${e.file}: user-provided, local-only — skipping`);
+        skipped++;
+        continue;
+      }
       if (existsSync(dest)) {
         cached++;
         continue;
@@ -71,7 +86,7 @@ async function main(): Promise<void> {
       }
     }
   }
-  console.log(`${downloaded} downloaded, ${cached} cached, ${failed} failed`);
+  console.log(`${downloaded} downloaded, ${cached} cached, ${skipped} skipped, ${failed} failed`);
   if (failed > 0) process.exit(1);
 }
 

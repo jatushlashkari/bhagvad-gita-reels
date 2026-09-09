@@ -332,7 +332,7 @@ async function sync(): Promise<{ ok: boolean; output: string }> {
         [
           'commit',
           '-m',
-          'feat: add custom background images via dashboard',
+          'chore: sync dashboard edits (backgrounds, style, beats)',
           '--',
           'public/assets/images',
           'public/assets/manifest.json',

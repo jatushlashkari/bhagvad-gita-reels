@@ -27,10 +27,7 @@ const CANDIDATES: Candidate[] = [
   { title: 'File:Radha in the Moonlight.jpg', slug: 'radha-moonlight' },
   { title: 'File:Saraswati by Raja Ravi Varma.jpg', slug: 'saraswati' },
   { title: 'File:Raja Ravi Varma, Goddess Lakshmi, 1896.jpg', slug: 'lakshmi' },
-  // Source is 972x1200 with Krishna embracing Yashoda from the LEFT third of the frame —
-  // the default centered crop pushes him out of frame entirely, so pin the crop to the
-  // left edge (verified visually against the raw painting; see task-7 report).
-  { title: 'File:Yashoda with Krishna, Raja Ravi Varma.jpg', slug: 'yashoda-krishna', crop: 'crop=1080:1920:0:0' },
+  // 'File:Yashoda with Krishna, Raja Ravi Varma.jpg' removed — checkpoint ruling 2026-09-09: platform-moderation risk in unattended pool.
 ];
 
 type ImageInfo = { url: string; width: number; height: number; license: string; source: string };

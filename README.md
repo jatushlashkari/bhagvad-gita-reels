@@ -61,6 +61,11 @@ fed by the same code the render uses, so what you see is what gets rendered.
   — nothing is posted, `state.json` is untouched, and it never changes `styles/cinema.json` by
   itself (only **Save as channel style** does that).
 
+Uploaded music stays on this machine — `public/assets/music/` is gitignored, so **Sync** never
+pushes it. The scheduled cloud run can't use `musicMode: "track"` until that track is committed or
+hosted somewhere the workflow can reach; until then it renders silent with a warning instead of
+failing.
+
 The daily scheduled run still uses `config.json`'s `"format"` (`classic` by default) regardless of
 what you preview in Studio — flip it to `"cinema"` yourself once you've saved a style you're happy
 with.

@@ -3,12 +3,23 @@ import { describe, it, expect } from 'vitest';
 import { validateBeatsFile } from '../shared/beats.ts';
 
 describe('sources/beats.json', () => {
-  it('exists, validates, and covers at least 100 verses', () => {
+  it('exists, validates, and covers at least 140 verses', () => {
     const beats = JSON.parse(readFileSync('sources/beats.json', 'utf8'));
     const gita = JSON.parse(readFileSync('sources/gita.json', 'utf8'));
     const refs = new Set<string>(gita.verses.map((v: { ref: string }) => v.ref));
     expect(() => validateBeatsFile(beats, refs)).not.toThrow();
-    expect(Object.keys(beats).length).toBeGreaterThanOrEqual(100);
+    expect(Object.keys(beats).length).toBeGreaterThanOrEqual(140);
+  });
+
+  it('keys are sorted chapter-then-verse numerically (refs are book:chapter:verse)', () => {
+    const beats = JSON.parse(readFileSync('sources/beats.json', 'utf8'));
+    const keys = Object.keys(beats);
+    const sorted = [...keys].sort((a, b) => {
+      const [, ca, va] = a.split(':');
+      const [, cb, vb] = b.split(':');
+      return Number(ca) - Number(cb) || Number(va) - Number(vb);
+    });
+    expect(keys).toEqual(sorted);
   });
 
   it('flagship verses are covered', () => {
