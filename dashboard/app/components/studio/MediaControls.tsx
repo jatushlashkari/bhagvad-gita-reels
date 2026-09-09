@@ -1,7 +1,7 @@
 'use client';
 import { useRef, useState } from 'react';
 import type { ReelStyle } from '../../../../shared/reel-style.ts';
-import { Field, ghostButtonClass, headingClass, panelClass, selectClass } from './ui.tsx';
+import { Field, ghostButtonClass, headingClass, labelClass, panelClass, selectClass } from './ui.tsx';
 
 export type Asset = { file: string; rel: string; kind: 'clip' | 'image' | 'music'; license: string };
 
@@ -18,6 +18,7 @@ export function MediaControls({
   background,
   onBackground,
   style,
+  prompt,
   onChange,
   onAssetsChanged,
 }: {
@@ -26,11 +27,15 @@ export function MediaControls({
   background: string;
   onBackground: (file: string) => void;
   style: ReelStyle;
+  /** The image prompt for the current source, composed by the page so the *unsaved* prefix
+   *  shows here immediately — there is nothing to save, it is copy-out only. */
+  prompt: string;
   onChange: (patch: Partial<ReelStyle>) => void;
   onAssetsChanged: () => void;
 }) {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [copied, setCopied] = useState<boolean | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Images first: the cinema format's own pool prefers images over clips (pipeline/run.ts), so the
@@ -64,6 +69,17 @@ export function MediaControls({
       setUploading(false);
       if (fileRef.current) fileRef.current.value = '';
     }
+  }
+
+  async function copyPrompt() {
+    let ok = true;
+    try {
+      await navigator.clipboard.writeText(prompt);
+    } catch {
+      ok = false; // no permission, or an insecure origin — say so rather than claim a copy
+    }
+    setCopied(ok);
+    setTimeout(() => setCopied(null), 1500);
   }
 
   return (
@@ -121,6 +137,20 @@ export function MediaControls({
           </li>
         ))}
       </ul>
+
+      {/* Copy-out for whichever image generator you use: the render never calls one, so this is
+          the only place the composed prompt (prefix + curated body or chapter theme) is visible. */}
+      <p className={`mt-5 ${labelClass}`}>image prompt</p>
+      <textarea
+        aria-label="image prompt"
+        readOnly
+        rows={3}
+        value={prompt}
+        className={`${selectClass} mt-2 resize-y`}
+      />
+      <button type="button" className={`${ghostButtonClass} mt-2`} onClick={() => void copyPrompt()}>
+        {copied === null ? 'Copy' : copied ? 'Copied' : 'Copy failed'}
+      </button>
 
       <p className="mt-5 text-[10px] uppercase tracking-[0.18em] text-[#a89f8d]">music</p>
       <div className="mt-2 flex flex-wrap gap-4">

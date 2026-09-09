@@ -12,12 +12,20 @@ export default function Page() {
           <h1 className="text-3xl font-semibold text-[#e8c874]">गीता Reels</h1>
           <p className="text-sm text-[#a89f8d]">daily shloka automation — control room</p>
         </div>
-        <Link
-          href="/studio"
-          className="rounded-lg border border-[#e8c874]/40 px-3 py-1.5 text-sm text-[#e8c874] transition-colors hover:bg-[#e8c874]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e8c874]/60"
-        >
-          Studio →
-        </Link>
+        <div className="flex gap-3">
+          <Link
+            href="/quotes"
+            className="rounded-lg border border-[#e8c874]/40 px-3 py-1.5 text-sm text-[#e8c874] transition-colors hover:bg-[#e8c874]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e8c874]/60"
+          >
+            Quotes →
+          </Link>
+          <Link
+            href="/studio"
+            className="rounded-lg border border-[#e8c874]/40 px-3 py-1.5 text-sm text-[#e8c874] transition-colors hover:bg-[#e8c874]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e8c874]/60"
+          >
+            Studio →
+          </Link>
+        </div>
       </header>
       <StatusBar />
       <GeneratePanel />

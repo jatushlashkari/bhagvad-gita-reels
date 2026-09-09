@@ -3,6 +3,14 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { computeCinemaTimeline, computeTimeline } from '../../../pipeline/timeline.ts';
+import {
+  CUSTOM_REF_PREFIX,
+  REF_PATTERN,
+  customRef,
+  placeholderVerse,
+  type CustomQuote,
+} from '../../../shared/custom-quotes.ts';
+import { promptFor } from '../../../shared/prompts.ts';
 import { DEFAULT_STYLE, type ReelStyle } from '../../../shared/reel-style.ts';
 import type { ReelProps, Verse } from '../../../shared/types.ts';
 import { BeatsEditor, beatsProblem } from '../components/studio/BeatsEditor.tsx';
@@ -19,6 +27,13 @@ const PreviewPane = dynamic(() => import('../components/studio/PreviewPane.tsx')
 });
 
 const REEL_URL = '/api/media/out/reel.mp4';
+
+/** What the Studio is pointed at: a Bhagavad Gita verse, or one of the user's own quotes.
+ *  Everything downstream (the ref, the beats, the preview's kicker and closing card) reads
+ *  from this one value, so the two modes can never half-apply. */
+type Source = { kind: 'verse'; ch: number; vs: number } | { kind: 'custom'; id: string };
+
+const GITA_OPTION = 'gita';
 
 /** Same reader as GeneratePanel: the routes answer `{ error }` JSON, but an unhandled server
  *  fault can still arrive as plain text or HTML — read the body once and surface what is there. */
@@ -54,13 +69,16 @@ function ReelPlayer() {
 export default function StudioPage() {
   const [chapters, setChapters] = useState<number[]>([]);
   const [handle, setHandle] = useState('');
-  const [ch, setCh] = useState(2);
-  const [vs, setVs] = useState(47);
-  const ref = `gita:${ch}:${vs}`;
+  const [source, setSource] = useState<Source>({ kind: 'verse', ch: 2, vs: 47 });
+  const ref = source.kind === 'verse' ? `gita:${source.ch}:${source.vs}` : customRef(source.id);
 
+  const [customQuotes, setCustomQuotes] = useState<CustomQuote[]>([]);
+  // Distinguishes "the list has not arrived yet" from "this id is not in the list".
+  const [customLoaded, setCustomLoaded] = useState(false);
   const [verse, setVerse] = useState<Verse | null>(null);
   const [beats, setBeats] = useState<string[]>([]);
   const [curated, setCurated] = useState(false);
+  const [curatedPrompt, setCuratedPrompt] = useState<string | null>(null);
   const [style, setStyle] = useState<ReelStyle>(DEFAULT_STYLE);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [background, setBackground] = useState(''); // file name; '' = Auto rotation
@@ -83,6 +101,16 @@ export default function StudioPage() {
       .catch(() => {});
   }, []);
 
+  const loadCustomQuotes = useCallback(() => {
+    fetch('/api/custom-quotes')
+      .then((r) => r.json())
+      .then((qs: CustomQuote[]) => {
+        setCustomQuotes(qs);
+        setCustomLoaded(true);
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     fetch('/api/state')
       .then((r) => r.json())
@@ -96,32 +124,104 @@ export default function StudioPage() {
       .then(setStyle)
       .catch(() => {});
     loadAssets();
-  }, [loadAssets]);
+    loadCustomQuotes();
+  }, [loadAssets, loadCustomQuotes]);
 
-  // Aborted on ref change so a slow response for an older verse can't land after — and overwrite
+  // `?ref=` deep link (the Quotes page's "Studio" / "Open in Studio" links). Read from
+  // window.location rather than useSearchParams: that hook forces the whole page under a
+  // Suspense boundary in Next 16, and this is a one-shot read of the entry URL.
+  useEffect(() => {
+    const param = new URLSearchParams(window.location.search).get('ref');
+    if (!param || !REF_PATTERN.test(param)) return;
+    if (param.startsWith(CUSTOM_REF_PREFIX)) {
+      setSource({ kind: 'custom', id: param.slice(CUSTOM_REF_PREFIX.length) });
+      return;
+    }
+    const [, ch, vs] = param.split(':');
+    setSource({ kind: 'verse', ch: Number(ch), vs: Number(vs) });
+  }, []);
+
+  // The quote behind a custom source. Missing means "not fetched yet", or an id that no longer
+  // exists — both render as the loading skeleton plus the note in the Source panel.
+  const quote = useMemo(
+    () => (source.kind === 'custom' ? customQuotes.find((q) => q.id === source.id) ?? null : null),
+    [source, customQuotes],
+  );
+
+  // One refetch per unknown id: a deep link can name a quote created after this page loaded,
+  // but retrying on every new (still missing) list would spin forever on a deleted id.
+  const refetchedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (source.kind !== 'custom' || quote || !customLoaded || refetchedFor.current === source.id) return;
+    refetchedFor.current = source.id;
+    loadCustomQuotes();
+  }, [source, quote, customLoaded, loadCustomQuotes]);
+
+  // Switching between a verse and a custom quote clears the old text; paging through verses does
+  // not, so the Player is only torn down when the two sources genuinely can't share a frame.
+  const prevKind = useRef(source.kind);
+
+  // Aborted on ref change so a slow response for an older ref can't land after — and overwrite
   // — the beats the user is now editing (same pattern as GeneratePanel's verse preview).
   useEffect(() => {
     const ac = new AbortController();
     const encoded = encodeURIComponent(ref);
     setBeatsStatus(null);
-    fetch(`/api/verse/${encoded}`, { signal: ac.signal })
+    if (prevKind.current !== source.kind) {
+      prevKind.current = source.kind;
+      setVerse(null);
+      setBeats([]);
+      setCurated(false);
+    }
+    // Both modes: sources/prompts.json for a verse, the quote's own prompt for a custom ref.
+    // Dropped first so the box can never offer another ref's curated text to the Copy button —
+    // until the fetch lands it shows the chapter-theme fallback, which at least belongs here.
+    setCuratedPrompt(null);
+    fetch(`/api/prompts/${encoded}`, { signal: ac.signal })
       .then((r) => (r.ok ? r.json() : null))
-      .then(setVerse)
+      .then((p: { curated: string | null } | null) => setCuratedPrompt(p?.curated ?? null))
       .catch(() => {});
-    fetch(`/api/beats/${encoded}`, { signal: ac.signal })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((b: { beats: string[]; curated: boolean } | null) => {
-        setBeats(b?.beats ?? []);
-        setCurated(b?.curated ?? false);
-      })
-      .catch(() => {});
+    if (source.kind === 'verse') {
+      fetch(`/api/verse/${encoded}`, { signal: ac.signal })
+        .then((r) => (r.ok ? r.json() : null))
+        .then(setVerse)
+        .catch(() => {});
+      fetch(`/api/beats/${encoded}`, { signal: ac.signal })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((b: { beats: string[]; curated: boolean } | null) => {
+          setBeats(b?.beats ?? []);
+          setCurated(b?.curated ?? false);
+        })
+        .catch(() => {});
+    }
     return () => ac.abort();
-  }, [ref]);
+  }, [ref, source]);
+
+  // A custom quote needs no fetch — its lines are the beats and its placeholder verse is what
+  // pipeline/run.ts builds for the same ref, so the preview matches the render.
+  useEffect(() => {
+    if (source.kind !== 'custom' || !quote) return;
+    setVerse(placeholderVerse(quote));
+    setBeats(quote.lines);
+    setCurated(true);
+  }, [source, quote]);
 
   const patchStyle = useCallback((patch: Partial<ReelStyle>) => {
     setSavedStyle(null);
     setStyle((s) => ({ ...s, ...patch }));
   }, []);
+
+  // Remembered so a hop to a custom quote and back returns to the verse you were on rather
+  // than to the 2.47 default.
+  const lastVerse = useRef({ ch: 2, vs: 47 });
+  function selectSource(value: string) {
+    if (value === GITA_OPTION) {
+      setSource({ kind: 'verse', ...lastVerse.current });
+      return;
+    }
+    if (source.kind === 'verse') lastVerse.current = { ch: source.ch, vs: source.vs };
+    setSource({ kind: 'custom', id: value.slice(CUSTOM_REF_PREFIX.length) });
+  }
 
   // Blank rows are "not written yet", not "render an empty card": they are dropped from the
   // preview and from every payload, exactly as pipeline/run.ts treats an empty override list.
@@ -135,7 +235,14 @@ export default function StudioPage() {
   // throw the same way for a very long translation. Either one has to surface as text next to the
   // controls — a throw inside the render tree would tear the Player down instead.
   const preview = useMemo<{ props: ReelProps | null; totalSec: number; error: string | null }>(() => {
-    if (!verse) return { props: null, totalSec: 0, error: null };
+    const custom = source.kind === 'custom' ? quote : null;
+    // `verse` is one paint behind `source` right after a switch. Painting a quote's placeholder
+    // verse as "GITA 0.0" — or a Gita verse under a quote's closing card — is worse than showing
+    // the loading skeleton for that frame.
+    if (!verse || (verse.book === 'custom') !== (source.kind === 'custom')) {
+      return { props: null, totalSec: 0, error: null };
+    }
+    if (source.kind === 'custom' && !custom) return { props: null, totalSec: 0, error: null };
     try {
       const timings = computeCinemaTimeline(liveBeats, style);
       const props: ReelProps = {
@@ -144,7 +251,14 @@ export default function StudioPage() {
         // pipeline/run.ts builds it, so a translation that would break the render breaks here too.
         timings: computeTimeline({ introDurSec: 3, meaningDurSec: 10, englishText: verse.english }),
         format: 'cinema',
-        cinema: { kicker: `GITA ${verse.chapter}.${verse.verse}`, beats: liveBeats, timings },
+        // Kicker and closing card exactly as pipeline/run.ts builds them for the same ref: a
+        // custom quote signs off with its attribution and has no romanised reference row.
+        cinema: {
+          kicker: custom ? custom.kicker : `GITA ${verse.chapter}.${verse.verse}`,
+          beats: liveBeats,
+          timings,
+          ...(custom ? { closing: { line: custom.attribution, reference: '' } } : {}),
+        },
         style,
         audio: { introFile: null, meaningFile: null },
         media: {
@@ -162,7 +276,14 @@ export default function StudioPage() {
     } catch (e) {
       return { props: null, totalSec: 0, error: e instanceof Error ? e.message : String(e) };
     }
-  }, [verse, liveBeats, style, backgroundRel, handle]);
+  }, [verse, liveBeats, style, backgroundRel, handle, source, quote]);
+
+  // Composed here rather than read from /api/quotes so the *unsaved* prefix in the Look panel
+  // shows up in the box immediately — same call the server makes for the Quotes table.
+  const prompt = useMemo(
+    () => promptFor(verse?.chapter ?? 0, liveBeats[0] ?? '', curatedPrompt, style.promptPrefix),
+    [verse, liveBeats, curatedPrompt, style.promptPrefix],
+  );
 
   async function saveStyle() {
     setSavingStyle(true);
@@ -194,13 +315,28 @@ export default function StudioPage() {
     setSavingBeats(true);
     setBeatsStatus(null);
     try {
-      const res = await fetch(`/api/beats/${encodeURIComponent(ref)}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ beats: liveBeats }),
-      });
+      // A custom quote's beats *are* its lines — they live in the quote itself, not in the
+      // per-verse beats file, so the same button patches the quote instead.
+      const res =
+        source.kind === 'custom'
+          ? await fetch(`/api/custom-quotes/${encodeURIComponent(source.id)}`, {
+              method: 'PUT',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ lines: liveBeats }),
+            })
+          : await fetch(`/api/beats/${encodeURIComponent(ref)}`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ beats: liveBeats }),
+            });
       if (!res.ok) {
         setBeatsStatus({ ok: false, text: `HTTP ${res.status}: ${await errorDetail(res)}` });
+        return;
+      }
+      if (source.kind === 'custom') {
+        const saved = (await res.json()) as CustomQuote;
+        setCustomQuotes((qs) => qs.map((q) => (q.id === saved.id ? saved : q)));
+        setBeatsStatus({ ok: true, text: 'saved to sources/custom-quotes.json' });
         return;
       }
       setBeats(liveBeats);
@@ -268,7 +404,7 @@ export default function StudioPage() {
     }
   }
 
-  const verseCount = chapters[ch - 1] ?? 1;
+  const verseCount = source.kind === 'verse' ? chapters[source.ch - 1] ?? 1 : 1;
   const problem = beatsProblem(beats);
   const previewNote =
     style.musicMode === 'rotation' ? ROTATION_NOTE : style.musicMode === 'track' && !style.musicFile ? 'no track selected — silent' : null;
@@ -287,38 +423,80 @@ export default function StudioPage() {
 
       <section className={panelClass}>
         <h2 className={headingClass}>Verse</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          <Field label="chapter" hint="अध्याय">
+        <div className={`mt-3 grid gap-3 ${source.kind === 'verse' ? 'sm:grid-cols-4' : 'sm:grid-cols-2'}`}>
+          <Field label="source">
             <select
-              aria-label="chapter"
+              aria-label="source"
               className={selectClass}
-              value={ch}
-              onChange={(e) => {
-                setCh(Number(e.target.value));
-                setVs(1); // the new chapter may be shorter than the current verse number
-              }}
+              value={source.kind === 'verse' ? GITA_OPTION : ref}
+              onChange={(e) => selectSource(e.target.value)}
             >
-              {Array.from({ length: chapters.length || 18 }, (_, i) => (
-                <option key={i + 1} value={i + 1}>
-                  {i + 1}
-                </option>
-              ))}
+              <option value={GITA_OPTION}>Bhagavad Gita</option>
+              {customQuotes.length > 0 && (
+                <optgroup label="Custom quotes">
+                  {customQuotes.map((q) => (
+                    <option key={q.id} value={customRef(q.id)}>
+                      {q.lines[0]}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </Field>
-          <Field label="verse" hint="श्लोक">
-            <select aria-label="verse" className={selectClass} value={vs} onChange={(e) => setVs(Number(e.target.value))}>
-              {Array.from({ length: verseCount }, (_, i) => (
-                <option key={i + 1} value={i + 1}>
-                  {i + 1}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <div className="self-end text-sm">
-            <span className="mr-2 text-[#e8c874] tabular-nums">गीता {ch}.{vs}</span>
-            <span className={verse ? 'text-[#a89f8d]' : 'text-[#a89f8d]/40'}>{verse ? verse.hindi : '—'}</span>
-          </div>
+
+          {source.kind === 'verse' ? (
+            <>
+              <Field label="chapter" hint="अध्याय">
+                <select
+                  aria-label="chapter"
+                  className={selectClass}
+                  value={source.ch}
+                  onChange={(e) => setSource({ kind: 'verse', ch: Number(e.target.value), vs: 1 })} // the new chapter may be shorter than the current verse number
+                >
+                  {Array.from({ length: chapters.length || 18 }, (_, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      {i + 1}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="verse" hint="श्लोक">
+                <select
+                  aria-label="verse"
+                  className={selectClass}
+                  value={source.vs}
+                  onChange={(e) => setSource({ kind: 'verse', ch: source.ch, vs: Number(e.target.value) })}
+                >
+                  {Array.from({ length: verseCount }, (_, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      {i + 1}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <div className="self-end text-sm">
+                <span className="mr-2 text-[#e8c874] tabular-nums">गीता {source.ch}.{source.vs}</span>
+                <span className={verse ? 'text-[#a89f8d]' : 'text-[#a89f8d]/40'}>{verse ? verse.hindi : '—'}</span>
+              </div>
+            </>
+          ) : (
+            <div className="self-end text-sm">
+              {quote ? (
+                <>
+                  <span className="mr-2 text-[#e8c874]">{quote.kicker}</span>
+                  <span className="text-[#a89f8d]">· {quote.attribution}</span>
+                </>
+              ) : (
+                <span className="text-[#a89f8d]/40">{customLoaded ? 'quote not found' : '—'}</span>
+              )}
+            </div>
+          )}
         </div>
+        <p className="mt-3 text-xs text-[#a89f8d]">
+          <Link href="/quotes" className="text-[#e8c874] transition-colors hover:underline">
+            manage on /quotes
+          </Link>
+        </p>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] lg:items-start">
@@ -353,6 +531,7 @@ export default function StudioPage() {
             background={background}
             onBackground={setBackground}
             style={style}
+            prompt={prompt}
             onChange={patchStyle}
             onAssetsChanged={loadAssets}
           />

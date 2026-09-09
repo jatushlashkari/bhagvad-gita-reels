@@ -97,6 +97,20 @@ export function StyleControls({
             onChange={(e) => onChange({ accentColor: e.target.value })}
           />
         </Field>
+
+        {/* Art direction only — it is prepended to every image prompt, curated or generated,
+            so the whole channel stays in one visual language (see shared/prompts.ts). */}
+        <div className="sm:col-span-2">
+          <Field label="prompt prefix" hint="≤200">
+            <input
+              aria-label="prompt prefix"
+              className={selectClass}
+              maxLength={200}
+              value={style.promptPrefix}
+              onChange={(e) => onChange({ promptPrefix: e.target.value })}
+            />
+          </Field>
+        </div>
       </div>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
