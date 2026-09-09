@@ -57,6 +57,7 @@ export function GeneratePanel() {
   const [vs, setVs] = useState(1);
   const [assets, setAssets] = useState<{ file: string; kind: string }[]>([]);
   const [bg, setBg] = useState(''); // '' = Auto
+  const [format, setFormat] = useState(''); // '' = Auto (config)
   const [preview, setPreview] = useState<{ hindi: string } | null>(null);
   const [log, setLog] = useState('');
   const [running, setRunning] = useState(false);
@@ -97,7 +98,7 @@ export function GeneratePanel() {
     try {
       const res = await fetch('/api/generate', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ref: `gita:${ch}:${vs}`, background: bg || undefined }),
+        body: JSON.stringify({ ref: `gita:${ch}:${vs}`, background: bg || undefined, format: format || undefined }),
       });
       if (res.status === 409) { setLog('A render is already in progress.'); setDone(false); return; }
       if (!res.ok) { appendLog(`HTTP ${res.status}: ${await errorDetail(res)}`); setDone(false); return; }
@@ -129,7 +130,7 @@ export function GeneratePanel() {
     <section className="rounded-xl bg-[#161028] p-4 ring-1 ring-white/5">
       <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#a89f8d]">Generate</h2>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="chapter" hint="अध्याय">
           <select
             aria-label="chapter"
@@ -176,6 +177,19 @@ export function GeneratePanel() {
                 ))}
               </optgroup>
             )}
+          </select>
+        </Field>
+
+        <Field label="format">
+          <select
+            aria-label="format"
+            className={selectClass}
+            value={format}
+            onChange={(e) => setFormat(e.target.value)}
+          >
+            <option value="">Auto (config)</option>
+            <option value="classic">Classic</option>
+            <option value="cinema">Cinema</option>
           </select>
         </Field>
       </div>

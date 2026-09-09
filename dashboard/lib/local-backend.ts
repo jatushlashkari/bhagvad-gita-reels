@@ -305,11 +305,24 @@ function isValidBackgroundName(name: string): boolean {
   return /^[A-Za-z0-9._-]{1,200}$/.test(name) && !name.startsWith('-');
 }
 
-function generateStream(ref: string, background?: string): ReadableStream<Uint8Array> | 'locked' {
+function generateStream(
+  ref: string,
+  background?: string,
+  format?: 'classic' | 'cinema',
+): ReadableStream<Uint8Array> | 'locked' {
   if (typeof ref !== 'string' || !/^[a-z]+:\d+:\d+$/.test(ref)) throw new Error('bad ref');
   if (background && !isValidBackgroundName(background)) throw new Error('invalid background');
+  if (format !== undefined && format !== 'classic' && format !== 'cinema') throw new Error('invalid format');
   if (!acquireLock()) return 'locked';
-  const args = ['tsx', 'pipeline/run.ts', '--verse', ref, '--dry-run', ...(background ? ['--background', background] : [])];
+  const args = [
+    'tsx',
+    'pipeline/run.ts',
+    '--verse',
+    ref,
+    '--dry-run',
+    ...(background ? ['--background', background] : []),
+    ...(format ? ['--format', format] : []),
+  ];
   const proc = spawn('npx', args, {
     cwd: REPO_ROOT,
     env: { ...process.env, PATH: `${process.env.PATH}:${join(homedir(), '.local/bin')}` },
