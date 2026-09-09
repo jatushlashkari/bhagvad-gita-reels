@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- New style keys default to today's look: `beatFont 'display'`, `kickerFont 'serif'`, `transition 'crossfade'`, `gapSec 0.4`, `promptPrefix` = `"Cinematic devotional painting, ultra-detailed, golden-hour light, deep cosmic blues and gold, reverent mood, no text —"`. `validateStyle` never throws; every existing preset stays valid.
+- New style keys default to today's look: `beatFont 'display'`, `kickerFont 'serif'`, `transition 'crossfade'`, `gapSec 0.4`, `promptPrefix` = `"Cinematic devotional painting, ultra-detailed, richly coloured, no text —"`. `validateStyle` never throws; every existing preset stays valid.
 - Fonts embed as data URLs via `scripts/embed-fonts.ts` → `video/fonts-embedded.ts` (both the TTFs under `public/assets/fonts/` and the generated file are committed; never HTTP at render); variable fonts load with weight range `'400 700'`; every font-family CSS stack ends with `NotoSerifDevanagari`.
 - Sequential mode: `start_i = start_{i-1} + dur_{i-1} + gapSec` (no overlap); closing starts `lastEnd + gapSec`; crossfade mode byte-identical to today; 12s floor + 59.5s cap unchanged.
 - Beat rules single-sourced (`BEAT_MIN/BEAT_MAX/BEAT_MAX_CHARS`, `NO_EMOJI` from `shared/beats.ts`) — custom-quote lines obey them; attribution ≤60, kicker ≤30, prompt ≤300, all emoji-free.
@@ -355,7 +355,7 @@ export function promptFor(chapter: number, hook: string, curated: string | null 
   return `${prefix.trim()} ${promptBody(chapter, hook, curated)}`.trim();
 }
 ```
-`shared/reel-style.ts`: `promptPrefix: string` in the type; `DEFAULT_STYLE.promptPrefix = 'Cinematic devotional painting, ultra-detailed, golden-hour light, deep cosmic blues and gold, reverent mood, no text —'`; `validateStyle`: `promptPrefix: typeof o.promptPrefix === 'string' ? o.promptPrefix.trim().slice(0, 200) : DEFAULT_STYLE.promptPrefix`.
+`shared/reel-style.ts`: `promptPrefix: string` in the type; `DEFAULT_STYLE.promptPrefix = 'Cinematic devotional painting, ultra-detailed, richly coloured, no text —'`; `validateStyle`: `promptPrefix: typeof o.promptPrefix === 'string' ? o.promptPrefix.trim().slice(0, 200) : DEFAULT_STYLE.promptPrefix`.
 - [ ] **Step 4: Author `sources/prompts.json`** — one entry per key of `sources/beats.json` (147), keys in the same order as `beats.json`. Read each verse's beats (`sources/beats.json`) and english (`sources/gita.json`) first. Rules: English; 60–300 chars; describe a SCENE (subject, setting, light, mood) tied to the verse's teaching; Krishna/Arjuna/deities in dignified classical Indian-painting iconography; never mention text, captions, lettering or titles; no real-person likeness; no emoji; each prompt unique; vary settings across neighbouring verses using the verse's own imagery (rivers, lamps, storms, lotus, the inverted tree, a still flame, a tortoise drawing in its limbs, a leaf on water, and so on) rather than 30 identical chariot scenes. Write with a script (`node -e` building the object) or by hand; validate with `npx vitest run scripts/prompts-validate.test.ts`.
 - [ ] **Step 5: PASS (all suites) + typechecks.** `npm test && npm run typecheck && npm run typecheck --prefix dashboard`
 - [ ] **Step 6: Commit** — `git add shared/prompts.ts shared/prompts.test.ts sources/prompts.json scripts/prompts-validate.test.ts shared/reel-style.ts shared/reel-style.test.ts && git commit -m "feat: image prompt engine with curated prompts for 147 verses"`

@@ -23,7 +23,7 @@ export const DEFAULT_STYLE: ReelStyle = {
   beatFont: 'display', kickerFont: 'serif', beatSizePx: 64, textColor: '#ffffff', accentColor: '#e8c874',
   scrimStrength: 0.45, durationScale: 1, crossfadeSec: 0.35, transition: 'crossfade', gapSec: 0.4, kenBurns: 'gentle',
   showKicker: true, showHandle: true, musicMode: 'silent', musicFile: null,
-  promptPrefix: 'Cinematic devotional painting, ultra-detailed, golden-hour light, deep cosmic blues and gold, reverent mood, no text —',
+  promptPrefix: 'Cinematic devotional painting, ultra-detailed, richly coloured, no text —',
 };
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));

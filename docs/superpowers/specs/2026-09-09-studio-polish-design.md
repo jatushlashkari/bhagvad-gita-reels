@@ -40,7 +40,7 @@
 
 - `sources/prompts.json` (committed): curated prompt per verse for the 147 curated-beat verses, authored during implementation. Rules: English, ≤300 chars, describes a SCENE (subject, setting, light, mood) tied to the verse's teaching; never instructs on-image text; no real-person likeness; devotional/respectful; no emoji.
 - Fallback for other verses: `shared/prompts.ts` → `promptFor(verse, hook, curated?: string, prefix: string): string` = `${prefix} ${curated ?? CHAPTER_THEMES[chapter] + ', ' + motif(hook)}` where `CHAPTER_THEMES` is an 18-entry table of scene descriptors (e.g. ch. 2 "Arjuna seated in his chariot on the field of Kurukshetra, Krishna turned toward him") and `motif(hook)` extracts 2–4 concrete nouns/verbs from the hook — pure, deterministic, tested.
-- `ReelStyle.promptPrefix: string` (≤200 chars, default `"Cinematic devotional painting, ultra-detailed, golden-hour light, deep cosmic blues and gold, reverent mood, no text —"`), editable in Studio so every prompt matches the user's chosen art direction.
+- `ReelStyle.promptPrefix: string` (≤200 chars, default `"Cinematic devotional painting, ultra-detailed, richly coloured, no text —"`), editable in Studio so every prompt matches the user's chosen art direction.
 - Surfaces: Studio Media section (prompt for the current verse/quote + Copy), Quotes page column, custom-quote form field.
 
 ## 6. Testing
