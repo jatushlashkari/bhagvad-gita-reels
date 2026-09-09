@@ -5,6 +5,14 @@ Fully automated daily reels: every morning at 7:00 AM IST, GitHub Actions picks 
 ## How it works
 
 ```
+publisher (hourly) → auto-fill upcoming days (render + release + thumbnail + captions) → publish what is due → commit schedule.json
+```
+
+Default mode is `config.json`'s `"mode": "calendar"`: `.github/workflows/publisher.yml` runs the line above every hour, keeping `config.schedule.daysAhead` days of rows rendered and ready — each archived as a GitHub Release asset, thumbnailed, and pre-filled with per-platform captions — then publishing whichever posts have reached their scheduled time, and committing `schedule.json` (+ `state.json`, `public/thumbs/`) so a re-run never double-posts. Details below, under "Publishing calendar (automation)".
+
+`"mode": "daily"` is the original fallback — one verse, once a morning:
+
+```
 schedule (07:00 IST)
   → pick next verse from state.json          pipeline/select.ts
   → Hindi TTS narration (edge-tts)           voice/tts.ts
@@ -128,6 +136,40 @@ Copy a prompt from the `/quotes` table (per verse) or from Studio's **Media** pa
 source's prompt, live as you edit beats or the prefix) — both have a **Copy** button. Paste it into
 your AI art tool, then upload the result from the control room's **Upload** panel (jpg/png/webp,
 ≤15 MB) and pick it as this verse's background from Studio's **Media** panel.
+
+## Publishing calendar (automation)
+
+`.github/workflows/publisher.yml` runs `npx tsx pipeline/publisher.ts` on an hourly cron (plus an
+on-demand `workflow_dispatch`), auto-filling upcoming rows and publishing whatever is due — see
+"How it works" above. It shares `daily-reel`'s runner, asset cache, and `YT_*`/`IG_*`/`GH_TOKEN`
+secrets, adding `FB_PAGE_ID` / `FB_PAGE_ACCESS_TOKEN` for Facebook.
+
+`config.json`'s `schedule` block drives auto-fill:
+
+```json
+"schedule": {
+  "daysAhead": 3,
+  "defaultTimes": { "instagram": "07:00", "facebook": "07:05", "youtube": "07:10" },
+  "timezone": "Asia/Kolkata"
+}
+```
+
+- **`daysAhead`** (1–14) — how many days of upcoming rows stay rendered and scheduled at all times.
+- **`defaultTimes`** — the local `HH:MM` each platform's post gets when a row is auto-filled, one
+  slot per platform so they go out staggered rather than all at once.
+- **`timezone`** — the IANA zone `defaultTimes` are read in (and the calendar UI displays them in);
+  posting times are stored as UTC underneath.
+
+`SCHEDULE_SKIP_RELEASE=1` is a local/test escape hatch — it renders a row without creating a GitHub
+Release, leaving `asset.url` empty. Such a row can never be published (the publisher refuses it),
+which makes it safe to exercise auto-fill without littering the repo's Releases page.
+
+A manual run (Actions tab → **publisher** → *Run workflow*) offers a `dry_run` input — the same idea
+as the CLI's `--dry-run`: rows still get rendered and scheduled, nothing gets posted.
+
+Like `daily-reel` and `refresh-instagram-token`, `publisher` stays **disabled** until its secrets
+and a supervised first run are ready. Turn it on with `gh workflow enable publisher` when you're
+ready to go live — see SETUP.md.
 
 ## Setup
 
