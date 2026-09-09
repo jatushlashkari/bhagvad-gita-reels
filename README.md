@@ -39,7 +39,7 @@ On your phone, open the same URL with your Mac's LAN IP instead of `localhost` (
 
 - **Upload** a background image (jpg/png/webp, ≤15 MB) — it's resized to 1080×1920 and recorded as `"User-provided"` in `public/assets/manifest.json`, the same licensing ledger the CC0/CC BY footage uses.
 - **Generate** renders any verse on demand — optionally pinned to one background from the pool — with a live streaming log and a playable/downloadable result. It's a dry run: nothing is posted, `state.json` is untouched.
-- **Sync** commits the uploaded images + manifest and pushes, so the next scheduled run picks them up in its background rotation.
+- **Sync** commits the uploaded images + manifest, the saved style and curated beats, and your quote favorites and custom quotes (`styles/cinema.json`, `sources/beats.json`, `sources/quotes-meta.json`, `sources/custom-quotes.json`) — then pushes, so the next scheduled run picks it all up.
 
 Only one render runs at a time; a second Generate while one is in flight is rejected until the first finishes.
 
@@ -50,10 +50,16 @@ fed by the same code the render uses, so what you see is what gets rendered.
 
 - **Beats** — edit the on-screen text per beat (2–6 of them), reorder, or add/remove; the preview
   updates as you type.
-- **Style** — beat font/size, text/accent colors, scrim strength, timing, Ken Burns, kicker/handle
-  toggles. **Save as channel style** writes the preset to `styles/cinema.json`, which every cinema
-  render (Studio's own **Render** button and the daily pipeline) reads from. It's a normal file in
-  the repo, so it travels with the dashboard's **Sync** like the background library does.
+- **Look** — a beat font (six faces: Archivo Black, Noto Serif, Cinzel, Playfair Display,
+  Montserrat, Bebas Neue) and a separate kicker font (Noto Serif, Cinzel or Montserrat) for the
+  top line and the closing-card handle, text/accent colors, scrim strength, timing, Ken Burns,
+  kicker/handle toggles, the beat **transition** — crossfade (the next beat overlaps as this one
+  fades out) or sequential (this beat fades fully out, the image holds alone for a **gap**, then
+  the next beat fades in) — with its **fade** and **gap** lengths, and a **prompt prefix** (the
+  art-direction line every image prompt starts with — see Image prompts below). **Save as channel
+  style** writes the preset to `styles/cinema.json`, which every cinema render (Studio's own
+  **Render** button and the daily pipeline) reads from. It's a normal file in the repo, so it
+  travels with the dashboard's **Sync** like the background library does.
 - **Media** — pick a background from the pool, and set music mode: silent, a specific track, or
   rotation (silent in the preview — the daily pick is deterministic per verse and happens
   server-side). Upload your own mp3 from the same panel.
@@ -69,6 +75,59 @@ failing.
 The daily scheduled run still uses `config.json`'s `"format"` (`classic` by default) regardless of
 what you preview in Studio — flip it to `"cinema"` yourself once you've saved a style you're happy
 with.
+
+### Quotes
+
+`/quotes` is the searchable index of every verse, plus your own. Search by ref, hook or beat text,
+filter by chapter, and toggle curated-only / favorites-only; favoriting a row (⭐) writes to
+`sources/quotes-meta.json`. Edit a verse's beats inline, right in the table (same 2–6 lines, ≤90
+chars rule as Studio's editor) — saving re-reads the row so the hook, curated flag and image prompt
+never drift from `sources/beats.json`. Every row's image prompt has a **Copy** button, and
+**Studio** opens that verse at `/studio?ref=<ref>` — the deep link Studio reads on load.
+
+A second panel lists your custom quotes with **Open in Studio**, **Edit** and **Delete**, and the
+form to write a new one — see Custom quotes below.
+
+### Custom quotes
+
+Your own text, rendered through the same cinema pipeline as a verse. Create, edit or delete one on
+`/quotes`'s Custom quotes panel: 2–6 lines (≤90 chars each, no emoji), an optional **attribution**
+(≤60 chars, defaults to `श्रीकृष्ण`) for the closing card, an optional **kicker** (≤30 chars,
+defaults to `श्रीकृष्ण कहते हैं`) for the top line, and an optional **image prompt** (≤300 chars —
+leave it blank to fall back to the chapter theme). Quotes are stored in `sources/custom-quotes.json`;
+each gets an id — a slug of its first line plus four random characters — used as its ref,
+`custom:<id>`.
+
+A custom quote always renders in the cinema format (`--format classic` is rejected for one) with
+its kicker as the top line, and a closing card that shows the attribution in place of a verse
+reference — no romanised "BHAGAVAD GITA chapter.verse" row. Render or preview one exactly like a
+verse, by ref:
+
+```bash
+npm run generate -- --verse custom:<id> --dry-run
+```
+
+It also appears in Studio's **source** selector, under a "Custom quotes" group, and its lines can
+be edited from there too — Studio's **Save beats** button patches the quote in place instead of
+writing to `sources/beats.json` when a custom quote is selected. Captions follow the same shape as a
+verse's, with the attribution standing in for the Sanskrit/reference block: the YouTube title is
+`hook | attribution #Shorts`, and the description and Instagram caption close with `— attribution`
+where a verse's would carry its Sanskrit text and translation credit.
+
+### Image prompts
+
+Every verse and custom quote gets an image prompt for backgrounds you generate yourself with
+whatever AI art tool you use — the pipeline never calls one. It's a curated body — from
+`sources/prompts.json` (147 verses today), or a custom quote's own `prompt` field — when one
+exists, else the verse's chapter theme plus a few motif words lifted from its hook beat. Either way
+it's prefixed with the style's **prompt prefix** (the art-direction line, e.g. "Cinematic
+devotional painting, ultra-detailed, richly coloured, no text —") — just another field on the
+saved style, so changing it in Studio's **Look** panel and saving re-styles every prompt at once.
+
+Copy a prompt from the `/quotes` table (per verse) or from Studio's **Media** panel (the current
+source's prompt, live as you edit beats or the prefix) — both have a **Copy** button. Paste it into
+your AI art tool, then upload the result from the control room's **Upload** panel (jpg/png/webp,
+≤15 MB) and pick it as this verse's background from Studio's **Media** panel.
 
 ## Setup
 
