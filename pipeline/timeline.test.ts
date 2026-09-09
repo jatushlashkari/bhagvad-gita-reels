@@ -75,4 +75,13 @@ describe('computeCinemaTimeline', () => {
   it('no style argument reproduces previous behavior', () => {
     expect(computeCinemaTimeline(['Do the work. Release the outcome.']).crossfadeSec).toBe(0.35);
   });
+
+  it('12s floor holds under durationScale < 1 (floor-triggering and non-floor pre-scale cases)', () => {
+    const a = computeCinemaTimeline(['Short one.'], { durationScale: 0.7, crossfadeSec: 0.35 });
+    expect(a.totalSec).toBeGreaterThanOrEqual(12);
+    const b = computeCinemaTimeline(['One line here.', 'Two lines more.', 'Three lines yet.'], { durationScale: 0.7, crossfadeSec: 0.35 });
+    expect(b.totalSec).toBeGreaterThanOrEqual(12);
+    for (const t of [a, b]) for (let i = 1; i < t.beats.length; i++)
+      expect(t.beats[i].startSec).toBeCloseTo(t.beats[i-1].startSec + t.beats[i-1].durSec - t.crossfadeSec, 5);
+  });
 });

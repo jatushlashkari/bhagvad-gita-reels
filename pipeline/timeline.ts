@@ -42,6 +42,50 @@ export function computeTimeline(input: {
   };
 }
 
+type CinemaSeq = { startSec: number; durSec: number };
+
+// 12s-floor pad for the natural (pre-scale) pacing: if the timeline (beats +
+// closing) undershoots the 12s minimum, grow beat 0 and the closing card by
+// equal "excess" amounts so both gain proportionally, then land exactly on 12s.
+function padToFloor(
+  seq: CinemaSeq[],
+  closingStartSec: number,
+  closingSec: number,
+  totalSec: number,
+): { seq: CinemaSeq[]; closingStartSec: number; closingSec: number; totalSec: number } {
+  if (totalSec >= 12) return { seq, closingStartSec, closingSec, totalSec };
+  const totalPad = 12 - totalSec;
+  const excess = seq[0].durSec - 2.4;
+  const pad_closing = (totalPad + excess) / 2;
+  const pad_beat = pad_closing - excess;
+  const paddedSeq = seq.map((b, i) =>
+    i === 0 ? { ...b, durSec: b.durSec + pad_beat } : { ...b, startSec: b.startSec + pad_beat },
+  );
+  return {
+    seq: paddedSeq,
+    closingStartSec: closingStartSec + pad_beat,
+    closingSec: closingSec + pad_closing,
+    totalSec: 12,
+  };
+}
+
+// Post-scale 12s-floor re-check. durationScale can push an already
+// floor-satisfying (or freshly re-padded) natural timeline back under 12s —
+// e.g. scale < 1 compressing a multi-beat sequence that didn't need padding
+// pre-scale. Deliberately NOT reusing padToFloor's symmetric beat/closing
+// split here: growing beat 0 again would partially undo the very
+// durationScale the caller asked for, and worst on exactly the beats most
+// likely to need this path (a single short beat scaled down — see
+// pipeline/timeline.test.ts "durationScale multiplies per-beat durations",
+// which pins beats[0].durSec to precisely rawDurSec * durationScale). The
+// closing card is a fixed signature moment, not part of the per-beat pacing
+// durationScale controls, so any post-scale shortfall is made up there
+// instead — it always can, since closingSec has no upper bound.
+function padClosingToFloor(closingSec: number, totalSec: number): { closingSec: number; totalSec: number } {
+  if (totalSec >= 12) return { closingSec, totalSec };
+  return { closingSec: closingSec + (12 - totalSec), totalSec: 12 };
+}
+
 export function computeCinemaTimeline(
   beats: string[],
   style?: Pick<ReelStyle, 'durationScale' | 'crossfadeSec'>,
@@ -58,20 +102,8 @@ export function computeCinemaTimeline(
     cursor = startSec + durSec - crossfadeSec;
     return { startSec, durSec };
   });
-  let closingStartSec = cursor;
-  let closingSec = closingBase;
-  let totalSec = closingStartSec + closingSec + 0.5;
-  if (totalSec < 12) {
-    const totalPad = 12 - totalSec;
-    const excess = seq[0].durSec - 2.4;
-    const pad_closing = (totalPad + excess) / 2;
-    const pad_beat = pad_closing - excess;
-    seq[0] = { ...seq[0], durSec: seq[0].durSec + pad_beat };
-    for (let i = 1; i < seq.length; i++) seq[i] = { ...seq[i], startSec: seq[i].startSec + pad_beat };
-    closingStartSec += pad_beat;
-    closingSec += pad_closing;
-    totalSec = 12;
-  }
+  const natural = padToFloor(seq, cursor, closingBase, cursor + closingBase + 0.5);
+
   // durationScale stretches/compresses the natural (floor/pad-balanced) per-beat
   // pacing computed above, re-run through the same crossfade-cascade formula.
   // Applying it here (rather than to the raw beatDurationSec before the 12s-floor
@@ -82,21 +114,23 @@ export function computeCinemaTimeline(
   // visible in every case, while durationScale=1 reproduces the pre-existing
   // numbers exactly (identical arithmetic, replayed).
   let scaledCursor = 1.0;
-  const scaledSeq = seq.map((b) => {
+  const scaledSeq = natural.seq.map((b) => {
     const durSec = b.durSec * durationScale;
     const startSec = scaledCursor;
     scaledCursor = startSec + durSec - crossfadeSec;
     return { startSec, durSec };
   });
   const scaledClosingStartSec = scaledCursor;
-  const scaledTotalSec = scaledClosingStartSec + closingSec + 0.5;
-  if (scaledTotalSec > 59.5) throw new TimelineTooLongError(scaledTotalSec);
+  const scaledTotalSec = scaledCursor + natural.closingSec + 0.5;
+  const final = padClosingToFloor(natural.closingSec, scaledTotalSec);
+
+  if (final.totalSec > 59.5) throw new TimelineTooLongError(final.totalSec);
   return {
     kickerInSec,
     beats: scaledSeq,
     crossfadeSec,
     closingStartSec: scaledClosingStartSec,
-    closingSec,
-    totalSec: scaledTotalSec,
+    closingSec: final.closingSec,
+    totalSec: final.totalSec,
   };
 }
