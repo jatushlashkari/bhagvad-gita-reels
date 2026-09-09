@@ -10,6 +10,12 @@ describe('custom quotes', () => {
     expect(q.id).toMatch(/^do-the-work-[a-z0-9]{4}$/);
     expect(q.createdAt).toBe('2026-09-09T00:00:00.000Z');
   });
+  it('whitespace-only attribution/kicker fall back to the defaults, and customQuoteProblem agrees', () => {
+    const q = validateCustomQuote({ lines: ['a.', 'b.'], attribution: '   ', kicker: '  ' }, []);
+    expect(q.attribution).toBe('श्रीकृष्ण');
+    expect(q.kicker).toBe('श्रीकृष्ण कहते हैं');
+    expect(customQuoteProblem({ lines: ['a.', 'b.'], attribution: '   ', kicker: '  ', prompt: '' })).toBeNull();
+  });
   it('rejects rule violations with the rule in the message', () => {
     expect(() => validateCustomQuote({ lines: ['only one.'] }, [])).toThrow(/2-6/);
     expect(() => validateCustomQuote({ lines: ['a.', 'b 🙏.'] }, [])).toThrow(/emoji/);

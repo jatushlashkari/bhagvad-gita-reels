@@ -21,9 +21,10 @@ export function slugId(firstLine: string, rand: string): string {
 const rand4 = () => Math.random().toString(36).slice(2, 6).padEnd(4, '0');
 
 function checkText(label: string, v: unknown, max: number, fallback: string): string {
-  if (v === undefined || v === null || v === '') return fallback;
+  if (v === undefined || v === null) return fallback;
   if (typeof v !== 'string') throw new Error(`${label} must be a string`);
   const s = v.trim();
+  if (s === '') return fallback; // whitespace-only counts as absent, same as undefined/null
   if (s.length > max) throw new Error(`${label} exceeds ${max} chars`);
   if (NO_EMOJI.test(s)) throw new Error(`${label} contains emoji`);
   return s;
