@@ -15,3 +15,19 @@ export function appendImageEntry(manifest: Manifest, file: string): Manifest {
     images: [...manifest.images, { file, url: '', license: 'User-provided', source: 'dashboard upload' }],
   };
 }
+
+export function slugifyAudioName(original: string, existing: string[]): string {
+  const stem = original.replace(/\.[^.]+$/, '').toLowerCase()
+    .normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'audio';
+  let name = `${stem}.mp3`;
+  for (let i = 2; existing.includes(name); i++) name = `${stem}-${i}.mp3`;
+  return name;
+}
+
+export function appendMusicEntry(manifest: Manifest, file: string): Manifest {
+  if (manifest.music.some((e) => e.file === file)) return manifest;
+  return {
+    ...manifest,
+    music: [...manifest.music, { file, url: '', license: 'User-provided', source: 'dashboard upload' }],
+  };
+}

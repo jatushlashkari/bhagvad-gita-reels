@@ -1,14 +1,26 @@
 import { spawn } from 'node:child_process';
-import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  createReadStream,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { readFile, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, normalize, resolve } from 'node:path';
 import { execa } from 'execa';
 import sharp from 'sharp';
 import { listBackgroundPool } from '../../shared/backgrounds.ts';
-import { appendImageEntry, slugifyImageName } from '../../shared/assets-store.ts';
+import { appendImageEntry, appendMusicEntry, slugifyAudioName, slugifyImageName } from '../../shared/assets-store.ts';
+import { beatsFromTranslation, validateBeatsFile } from '../../shared/beats.ts';
 import { isAllowedMediaPath } from '../../shared/media-path.ts';
+import { validateStyle, type ReelStyle } from '../../shared/reel-style.ts';
 import { pickNext, readState, verseOrder, type PlatformKey } from '../../pipeline/select.ts';
+import { loadStylePreset } from '../../pipeline/run.ts';
 import type { Manifest } from '../../scripts/fetch-assets.ts';
 import type { Verse } from '../../shared/types.ts';
 import type { AssetInfo, Backend, MediaHandle, StateSummary } from './backend.ts';
@@ -28,12 +40,19 @@ const MEDIA_TYPES: Record<string, string> = {
   jpeg: 'image/jpeg',
   png: 'image/png',
   webp: 'image/webp',
+  mp3: 'audio/mpeg',
 };
 
 /** Thrown by saveImage when the uploaded bytes don't decode as an image (e.g. a text file
  *  renamed with a .jpg extension). Routes catch this specifically to answer a clean 400
  *  instead of letting an opaque 500 leak out of the sharp pipeline. */
 export class InvalidImageError extends Error {}
+
+/** Thrown by saveAudio when the uploaded bytes exceed the 20 MB cap. The upload route already
+ *  checks this before calling saveAudio (same defense-in-depth pattern as saveImage's route-level
+ *  extension/size check) — this is the backend's own backstop for any other caller. */
+export class InvalidAudioError extends Error {}
+const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
 
 async function readManifest(): Promise<Manifest> {
   return JSON.parse(await readFile(join(REPO_ROOT, 'public/assets/manifest.json'), 'utf8'));
@@ -59,17 +78,28 @@ async function listAssets(): Promise<AssetInfo[]> {
   });
 }
 
-// Concurrent uploads must not interleave: two requests racing through slugifyImageName could
-// compute the same slug, or two manifest read-modify-write cycles could race and one write
-// could silently clobber the other's appended entry. The dashboard runs as a single Node
-// process, so a module-level promise chain is enough to serialize saveImage calls end-to-end
-// (slug pick -> resize -> write -> manifest read-modify-write) without needing a real file lock.
+// Concurrent uploads must not interleave: two requests racing through slugifyImageName/
+// slugifyAudioName could compute the same slug, or two manifest read-modify-write cycles could
+// race and one write could silently clobber the other's appended entry. The dashboard runs as a
+// single Node process, so a module-level promise chain is enough to serialize saveImage AND
+// saveAudio calls end-to-end (slug pick -> write -> manifest read-modify-write), across both
+// upload kinds, without needing a real file lock.
 let queue: Promise<void> = Promise.resolve();
 
 function saveImage(name: string, data: Buffer): Promise<AssetInfo> {
   const result = queue.then(() => saveImageExclusive(name, data));
   // Keep the chain alive even if this upload failed, so one bad upload doesn't wedge every
   // upload after it; the caller of saveImage still sees the real outcome via `result`.
+  queue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
+function saveAudio(name: string, data: Buffer): Promise<AssetInfo> {
+  const result = queue.then(() => saveAudioExclusive(name, data));
+  // Same reasoning as saveImage above: keep the shared chain alive even on failure.
   queue = result.then(
     () => undefined,
     () => undefined,
@@ -110,6 +140,32 @@ async function saveImageExclusive(name: string, data: Buffer): Promise<AssetInfo
   return { file, rel: `assets/images/${file}`, kind: 'image', license: 'User-provided' };
 }
 
+// No decode/transcode step for audio (design spec §5: "mp3 passthrough" in v1) — the size cap is
+// the only content check, so it's enforced first, before anything touches disk.
+async function saveAudioExclusive(name: string, data: Buffer): Promise<AssetInfo> {
+  if (data.length > MAX_AUDIO_BYTES) throw new InvalidAudioError(`"${name}" exceeds ${MAX_AUDIO_BYTES} bytes`);
+
+  const dir = join(REPO_ROOT, 'public/assets/music');
+  mkdirSync(dir, { recursive: true });
+  const existing = readdirSync(dir).filter((f) => /\.mp3$/i.test(f));
+  const file = slugifyAudioName(name, existing);
+
+  const dest = join(dir, file);
+  await writeFile(dest, data);
+
+  try {
+    const manifest = await readManifest();
+    await writeManifestFile(appendMusicEntry(manifest, file));
+  } catch (e) {
+    // Same "never leave partial state" bar as saveImageExclusive: a manifest write failing after
+    // the file already landed on disk must not leave an untracked orphan behind.
+    await unlink(dest).catch(() => {});
+    throw e;
+  }
+
+  return { file, rel: `assets/music/${file}`, kind: 'music', license: 'User-provided' };
+}
+
 async function getState(): Promise<StateSummary> {
   const [state, config, sources] = await Promise.all([
     readState(join(REPO_ROOT, 'state.json')),
@@ -134,10 +190,62 @@ async function getState(): Promise<StateSummary> {
   return { lastPosted, nextRef, totalPosted: state.posted.length, chapters };
 }
 
-async function getVerse(ref: string): Promise<{ sanskrit: string[]; hindi: string; english: string } | null> {
+async function getVerse(ref: string): Promise<Verse | null> {
   const sources = JSON.parse(await readFile(join(REPO_ROOT, 'sources/gita.json'), 'utf8')) as { verses: Verse[] };
+  return sources.verses.find((v) => v.ref === ref) ?? null;
+}
+
+const STYLE_PATH = () => join(REPO_ROOT, 'styles/cinema.json');
+
+async function getStyle(): Promise<ReelStyle> {
+  return loadStylePreset(STYLE_PATH());
+}
+
+async function saveStyle(s: unknown): Promise<ReelStyle> {
+  const style = validateStyle(s);
+  await writeFile(STYLE_PATH(), JSON.stringify(style, null, 2) + '\n');
+  return style;
+}
+
+const BEATS_PATH = () => join(REPO_ROOT, 'sources/beats.json');
+
+async function getBeats(ref: string): Promise<{ beats: string[]; curated: boolean } | null> {
+  const [sources, beatsFile] = await Promise.all([
+    readFile(join(REPO_ROOT, 'sources/gita.json'), 'utf8').then((s) => JSON.parse(s) as { verses: Verse[] }),
+    readFile(BEATS_PATH(), 'utf8').then((s) => JSON.parse(s) as Record<string, string[]>),
+  ]);
   const verse = sources.verses.find((v) => v.ref === ref);
-  return verse ? { sanskrit: verse.sanskrit, hindi: verse.hindi, english: verse.english } : null;
+  if (!verse) return null;
+  const curated = beatsFile[ref];
+  return curated ? { beats: curated, curated: true } : { beats: beatsFromTranslation(verse.english), curated: false };
+}
+
+// Sorted chapter-then-verse: refs are `book:chapter:verse` (e.g. "gita:2:47") for the one book
+// this project has today, so a numeric compare on the two trailing segments is enough — matching
+// sources/beats.json's existing key order exactly, so a diff only ever shows the entry that
+// actually changed.
+function sortBeatsKeys(beats: Record<string, string[]>): Record<string, string[]> {
+  const sortedKeys = Object.keys(beats).sort((a, b) => {
+    const [, ca, va] = a.split(':');
+    const [, cb, vb] = b.split(':');
+    return Number(ca) - Number(cb) || Number(va) - Number(vb);
+  });
+  const sorted: Record<string, string[]> = {};
+  for (const k of sortedKeys) sorted[k] = beats[k];
+  return sorted;
+}
+
+async function saveBeats(ref: string, beats: string[]): Promise<void> {
+  const sources = JSON.parse(await readFile(join(REPO_ROOT, 'sources/gita.json'), 'utf8')) as { verses: Verse[] };
+  const verseRefs = new Set(sources.verses.map((v) => v.ref));
+  // Validates only the changed entry (ref known, 2-6 lines, ≤90 chars, no emoji) — not the whole
+  // file — so an edit here can never be rejected by some other, already-committed entry, and can
+  // never re-litigate rules an already-valid entry happens to predate.
+  validateBeatsFile({ [ref]: beats }, verseRefs);
+
+  const existing = JSON.parse(await readFile(BEATS_PATH(), 'utf8')) as Record<string, string[]>;
+  const merged = sortBeatsKeys({ ...existing, [ref]: beats });
+  await writeFile(BEATS_PATH(), JSON.stringify(merged, null, 2) + '\n');
 }
 
 function errorText(e: unknown): string {
@@ -157,9 +265,11 @@ function gitOutput(e: unknown): string {
 async function sync(): Promise<{ ok: boolean; output: string }> {
   const log: string[] = [];
   try {
-    const add = await execa('git', ['add', 'public/assets/images', 'public/assets/manifest.json'], {
-      cwd: REPO_ROOT,
-    });
+    const add = await execa(
+      'git',
+      ['add', 'public/assets/images', 'public/assets/manifest.json', 'styles', 'sources/beats.json'],
+      { cwd: REPO_ROOT },
+    );
     log.push(add.stdout, add.stderr);
     try {
       // Pathspec-scoped commit, not a bare `git commit`: a bare commit picks up *anything* the
@@ -177,6 +287,8 @@ async function sync(): Promise<{ ok: boolean; output: string }> {
           '--',
           'public/assets/images',
           'public/assets/manifest.json',
+          'styles',
+          'sources/beats.json',
         ],
         { cwd: REPO_ROOT },
       );
@@ -305,15 +417,43 @@ function isValidBackgroundName(name: string): boolean {
   return /^[A-Za-z0-9._-]{1,200}$/.test(name) && !name.startsWith('-');
 }
 
+type GenerateOverrides = { beats?: string[]; style?: unknown; music?: string | null };
+const MAX_OVERRIDE_BEATS = 6;
+const OVERRIDES_PATH = () => join(REPO_ROOT, 'out/studio-overrides.json');
+
+// Same shape the route enforces (see generate/route.ts's isValidOverrides) — checked here too so
+// a caller that bypasses the route can't hand the pipeline a malformed overrides file. This is
+// deliberately shallow: per-beat length/emoji rules and music-pool membership are pipeline/run.ts's
+// job (resolveCinemaInputs) — see the studio-panel plan's Task 3 self-review ruling that CLI
+// --overrides gets its own defense-in-depth there.
+function isValidOverridesShape(o: unknown): o is GenerateOverrides {
+  if (o === null || typeof o !== 'object' || Array.isArray(o)) return false;
+  const r = o as Record<string, unknown>;
+  if ('beats' in r && r.beats !== undefined) {
+    if (!Array.isArray(r.beats) || r.beats.length > MAX_OVERRIDE_BEATS || !r.beats.every((b) => typeof b === 'string'))
+      return false;
+  }
+  if ('music' in r && r.music !== undefined && r.music !== null && typeof r.music !== 'string') return false;
+  if ('style' in r && r.style !== undefined) {
+    if (typeof r.style !== 'object' || r.style === null || Array.isArray(r.style)) return false;
+  }
+  return true;
+}
+
 function generateStream(
   ref: string,
   background?: string,
   format?: 'classic' | 'cinema',
+  overrides?: GenerateOverrides,
 ): ReadableStream<Uint8Array> | 'locked' {
   if (typeof ref !== 'string' || !/^[a-z]+:\d+:\d+$/.test(ref)) throw new Error('bad ref');
   if (background && !isValidBackgroundName(background)) throw new Error('invalid background');
   if (format !== undefined && format !== 'classic' && format !== 'cinema') throw new Error('invalid format');
+  if (overrides !== undefined && !isValidOverridesShape(overrides)) throw new Error('invalid overrides');
   if (!acquireLock()) return 'locked';
+  // Written only after the lock is ours: only one render is ever in flight, so there is never a
+  // second writer racing this file out from under the render that is about to read it.
+  if (overrides !== undefined) writeFileSync(OVERRIDES_PATH(), JSON.stringify(overrides, null, 2) + '\n');
   const args = [
     'tsx',
     'pipeline/run.ts',
@@ -322,6 +462,7 @@ function generateStream(
     '--dry-run',
     ...(background ? ['--background', background] : []),
     ...(format ? ['--format', format] : []),
+    ...(overrides !== undefined ? ['--overrides', 'out/studio-overrides.json'] : []),
   ];
   const proc = spawn('npx', args, {
     cwd: REPO_ROOT,
@@ -417,8 +558,13 @@ export const localBackend: Backend = {
   repoRoot,
   listAssets,
   saveImage,
+  saveAudio,
   getState,
   getVerse,
+  getStyle,
+  saveStyle,
+  getBeats,
+  saveBeats,
   sync,
   openMedia,
   generate: generateStream,

@@ -45,6 +45,19 @@ describe('isAllowedMediaPath', () => {
   });
 
   it('exports the whitelist itself', () => {
-    expect(ALLOWED_MEDIA).toEqual(['public/assets/backgrounds/', 'public/assets/images/', 'out/reel.mp4']);
+    expect(ALLOWED_MEDIA).toEqual([
+      'public/assets/backgrounds/',
+      'public/assets/images/',
+      'public/assets/music/',
+      'out/reel.mp4',
+    ]);
+  });
+
+  it('allows an ordinary file under the music directory', () => {
+    expect(isAllowedMediaPath(['public', 'assets', 'music', 't.mp3'].join('/'))).toBe(true);
+  });
+
+  it('rejects an escape attempt rooted under the music directory', () => {
+    expect(isAllowedMediaPath(['public', 'assets', 'music', '..', '..', 'secret'].join('/'))).toBe(false);
   });
 });
