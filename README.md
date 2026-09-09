@@ -43,6 +43,28 @@ On your phone, open the same URL with your Mac's LAN IP instead of `localhost` (
 
 Only one render runs at a time; a second Generate while one is in flight is rejected until the first finishes.
 
+### Studio
+
+`/studio` is where you design the cinema look — a live Remotion `<Player>` preview of any verse,
+fed by the same code the render uses, so what you see is what gets rendered.
+
+- **Beats** — edit the on-screen text per beat (2–6 of them), reorder, or add/remove; the preview
+  updates as you type.
+- **Style** — beat font/size, text/accent colors, scrim strength, timing, Ken Burns, kicker/handle
+  toggles. **Save as channel style** writes the preset to `styles/cinema.json`, which every cinema
+  render (Studio's own **Render** button and the daily pipeline) reads from. It's a normal file in
+  the repo, so it travels with the dashboard's **Sync** like the background library does.
+- **Media** — pick a background from the pool, and set music mode: silent, a specific track, or
+  rotation (silent in the preview — the daily pick is deterministic per verse and happens
+  server-side). Upload your own mp3 from the same panel.
+- **Render** in Studio is always a dry run with your current edits layered on as one-off overrides
+  — nothing is posted, `state.json` is untouched, and it never changes `styles/cinema.json` by
+  itself (only **Save as channel style** does that).
+
+The daily scheduled run still uses `config.json`'s `"format"` (`classic` by default) regardless of
+what you preview in Studio — flip it to `"cinema"` yourself once you've saved a style you're happy
+with.
+
 ## Setup
 
 One-time platform setup (Meta app, Google OAuth, secrets): see **SETUP.md**.
