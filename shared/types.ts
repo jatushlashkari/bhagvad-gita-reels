@@ -28,10 +28,21 @@ export type Timings = {
   meaningAudioStartSec: number; // when meaning VO starts (= meaningStartSec)
 };
 
+export type CinemaTimings = {
+  kickerInSec: number;
+  crossfadeSec: number;
+  beats: { startSec: number; durSec: number }[];
+  closingStartSec: number;
+  closingSec: number;
+  totalSec: number;
+};
+
 export type ReelProps = {
   verse: Verse;
   timings: Timings;
   audio: { introFile: string | null; meaningFile: string | null }; // staticFile()-relative, null = silent
   media: { background: string | null; music: string | null };      // null = gradient / no music
   brand: { handle: string };
+  format?: 'classic' | 'cinema';
+  cinema?: { kicker: string; beats: string[]; timings: CinemaTimings };
 };

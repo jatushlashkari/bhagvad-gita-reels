@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeTimeline, TimelineTooLongError } from './timeline.ts';
+import { computeTimeline, TimelineTooLongError, computeCinemaTimeline } from './timeline.ts';
 
 const base = { introDurSec: 3.2, meaningDurSec: 14, englishText: 'x'.repeat(80) };
 
@@ -29,5 +29,36 @@ describe('computeTimeline', () => {
 
   it('throws TimelineTooLongError past 59.5s', () => {
     expect(() => computeTimeline({ ...base, meaningDurSec: 45 })).toThrow(TimelineTooLongError);
+  });
+});
+
+describe('computeCinemaTimeline', () => {
+  const beats = ['Do the work. Release the outcome.', 'You control the effort.', 'You never controlled the results.'];
+
+  it('sequences beats with crossfade overlap from 1.0s', () => {
+    const t = computeCinemaTimeline(beats);
+    expect(t.kickerInSec).toBe(0.8);
+    expect(t.crossfadeSec).toBe(0.35);
+    expect(t.beats[0].startSec).toBe(1.0);
+    expect(t.beats[1].startSec).toBeCloseTo(1.0 + t.beats[0].durSec - 0.35, 5);
+    expect(t.closingStartSec).toBeCloseTo(t.beats[2].startSec + t.beats[2].durSec - 0.35, 5);
+    expect(t.totalSec).toBeCloseTo(t.closingStartSec + t.closingSec + 0.5, 5);
+  });
+
+  it('applies the duration formula per beat', () => {
+    const t = computeCinemaTimeline(beats);
+    expect(t.beats[0].durSec).toBeCloseTo(Math.min(4.2, 1.8 + beats[0].length / 16), 5);
+  });
+
+  it('pads hook and closing equally up to the 12s floor', () => {
+    const t = computeCinemaTimeline(['Short one.', 'Short two.']);
+    expect(t.totalSec).toBeGreaterThanOrEqual(12);
+    expect(t.beats[0].durSec).toBeGreaterThan(2.4);
+    expect(t.closingSec).toBeGreaterThan(3.2);
+    expect(t.beats[0].durSec - 2.4).toBeCloseTo(t.closingSec - 3.2, 5);
+  });
+
+  it('rejects empty beats and impossible lengths', () => {
+    expect(() => computeCinemaTimeline([])).toThrow(/at least/);
   });
 });

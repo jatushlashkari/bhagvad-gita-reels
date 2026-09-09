@@ -1,4 +1,5 @@
-import type { Timings } from '../shared/types.ts';
+import { beatDurationSec } from '../shared/beats.ts';
+import type { Timings, CinemaTimings } from '../shared/types.ts';
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
@@ -38,4 +39,34 @@ export function computeTimeline(input: {
     introAudioStartSec: shlokaStartSec,
     meaningAudioStartSec: meaningStartSec,
   };
+}
+
+export function computeCinemaTimeline(beats: string[]): CinemaTimings {
+  if (beats.length < 1) throw new Error('cinema needs at least one beat');
+  const kickerInSec = 0.8;
+  const crossfadeSec = 0.35;
+  const closingBase = 3.2;
+  let cursor = 1.0;
+  const seq = beats.map((b) => {
+    const durSec = beatDurationSec(b);
+    const startSec = cursor;
+    cursor = startSec + durSec - crossfadeSec;
+    return { startSec, durSec };
+  });
+  let closingStartSec = cursor;
+  let closingSec = closingBase;
+  let totalSec = closingStartSec + closingSec + 0.5;
+  if (totalSec < 12) {
+    const totalPad = 12 - totalSec;
+    const excess = seq[0].durSec - 2.4;
+    const pad_closing = (totalPad + excess) / 2;
+    const pad_beat = pad_closing - excess;
+    seq[0] = { ...seq[0], durSec: seq[0].durSec + pad_beat };
+    for (let i = 1; i < seq.length; i++) seq[i] = { ...seq[i], startSec: seq[i].startSec + pad_beat };
+    closingStartSec += pad_beat;
+    closingSec += pad_closing;
+    totalSec = 12;
+  }
+  if (totalSec > 59.5) throw new TimelineTooLongError(totalSec);
+  return { kickerInSec, beats: seq, crossfadeSec, closingStartSec, closingSec, totalSec };
 }
