@@ -124,7 +124,9 @@ export function GeneratePanel() {
 
   const verseCount = chapters[ch - 1] ?? 1;
   const images = assets.filter((a) => a.kind === 'image');
-  const clips = assets.filter((a) => a.kind !== 'image');
+  // `kind === 'clip'`, not `!== 'image'`: /api/assets also lists the mp3 music pool now (the
+  // Studio's music picker reads it), and an mp3 is not a background this select may offer.
+  const clips = assets.filter((a) => a.kind === 'clip');
 
   return (
     <section className="rounded-xl bg-[#161028] p-4 ring-1 ring-white/5">

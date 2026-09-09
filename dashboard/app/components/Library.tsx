@@ -1,15 +1,17 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 
-type Asset = { file: string; rel: string; kind: 'clip' | 'image'; license: string };
+type Asset = { file: string; rel: string; kind: 'clip' | 'image' | 'music'; license: string };
 
 export function Library() {
   const [assets, setAssets] = useState<Asset[]>([]);
 
+  // /api/assets also carries the mp3 pool (the Studio's music picker needs it); this panel is the
+  // *background* library, so music is dropped at the door rather than tiled as a broken <video>.
   const load = useCallback(() => {
     fetch('/api/assets')
       .then((r) => r.json())
-      .then(setAssets)
+      .then((all: Asset[]) => setAssets(all.filter((a) => a.kind !== 'music')))
       .catch(() => {});
   }, []);
 

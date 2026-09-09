@@ -1,7 +1,9 @@
 import { AbsoluteFill, Img, Loop, OffthreadVideo, interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
 import { FPS, type ReelProps } from '../../shared/types.ts';
 import type { ReelStyle } from '../../shared/reel-style.ts';
-import { IMAGE_EXT, kenBurnsVariant } from '../../shared/backgrounds.ts';
+// ./background-kind.ts, not ./backgrounds.ts: this component is bundled for a browser (the
+// Studio Player and the render's headless Chrome), and backgrounds.ts imports node:fs.
+import { IMAGE_EXT, kenBurnsVariant } from '../../shared/background-kind.ts';
 import { resolveMedia } from '../media.ts';
 
 // Every background is normalized to exactly 12s/30fps at fetch time (scripts/fetch-assets.ts).

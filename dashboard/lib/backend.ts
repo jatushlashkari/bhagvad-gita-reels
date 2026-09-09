@@ -8,6 +8,8 @@ export type StateSummary = {
   nextRef: string | null;
   totalPosted: number;
   chapters: number[];
+  /** config.json's `handle` — the Studio preview stamps it on the cards exactly as the render does. */
+  handle: string;
 };
 export type MediaHandle = {
   size: number;

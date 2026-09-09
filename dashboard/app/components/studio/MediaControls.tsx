@@ -1,0 +1,184 @@
+'use client';
+import { useRef, useState } from 'react';
+import type { ReelStyle } from '../../../../shared/reel-style.ts';
+import { Field, ghostButtonClass, headingClass, panelClass, selectClass } from './ui.tsx';
+
+export type Asset = { file: string; rel: string; kind: 'clip' | 'image' | 'music'; license: string };
+
+export const ROTATION_NOTE = 'preview plays silent; the daily render picks a track per verse';
+
+const MUSIC_MODES: { value: ReelStyle['musicMode']; label: string }[] = [
+  { value: 'silent', label: 'Silent' },
+  { value: 'track', label: 'This track' },
+  { value: 'rotation', label: 'Rotation' },
+];
+
+export function MediaControls({
+  assets,
+  background,
+  onBackground,
+  style,
+  onChange,
+  onAssetsChanged,
+}: {
+  assets: Asset[];
+  /** Selected background *file name* (what POST /api/generate takes), '' = Auto rotation. */
+  background: string;
+  onBackground: (file: string) => void;
+  style: ReelStyle;
+  onChange: (patch: Partial<ReelStyle>) => void;
+  onAssetsChanged: () => void;
+}) {
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // Images first: the cinema format's own pool prefers images over clips (pipeline/run.ts), so the
+  // strip leads with what a cinema render would actually reach for.
+  const images = assets.filter((a) => a.kind === 'image');
+  const clips = assets.filter((a) => a.kind === 'clip');
+  const backgrounds = [...images, ...clips];
+  const tracks = assets.filter((a) => a.kind === 'music');
+
+  async function upload(file: File) {
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      const res = await fetch('/api/upload', { method: 'POST', body });
+      const payload = (await res.json().catch(() => null)) as { error?: string; file?: string; kind?: string } | null;
+      if (!res.ok) {
+        setUploadError(payload?.error ?? `upload failed (HTTP ${res.status})`);
+        return;
+      }
+      onAssetsChanged();
+      // Select what was just uploaded — uploading a track and then having to find it in the
+      // dropdown is the kind of half-step that makes a control room feel like a form. Gated on
+      // the saved asset's own `kind`, so a non-mp3 slipped past the accept filter can never end
+      // up nominated as the music track.
+      if (payload?.kind === 'music' && payload.file) onChange({ musicMode: 'track', musicFile: payload.file });
+    } catch (e) {
+      setUploadError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
+  return (
+    <section className={panelClass}>
+      <h2 className={headingClass}>Media</h2>
+
+      <p className="mt-3 text-[10px] uppercase tracking-[0.18em] text-[#a89f8d]">background</p>
+      <ul className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-6">
+        <li>
+          <button
+            type="button"
+            aria-label="background auto"
+            aria-pressed={background === ''}
+            onClick={() => onBackground('')}
+            className={`flex aspect-[9/16] w-full items-center justify-center rounded-lg bg-[#0d0817] text-center text-[10px] leading-tight text-[#a89f8d] ring-1 transition-colors ${
+              background === '' ? 'ring-2 ring-[#e8c874]' : 'ring-white/10 hover:ring-white/25'
+            }`}
+          >
+            Auto
+            <br />
+            (rotation)
+          </button>
+        </li>
+        {backgrounds.map((a) => (
+          <li key={a.rel}>
+            <button
+              type="button"
+              aria-label={`background ${a.file}`}
+              aria-pressed={background === a.file}
+              onClick={() => onBackground(a.file)}
+              title={`${a.file} — ${a.license}`}
+              className={`block w-full overflow-hidden rounded-lg ring-1 transition-colors ${
+                background === a.file ? 'ring-2 ring-[#e8c874]' : 'ring-white/10 hover:ring-white/25'
+              }`}
+            >
+              {a.kind === 'image' ? (
+                // plain <img>: these live in the repo's public/assets, outside dashboard/public,
+                // so they are only reachable through the /api/media route (same as Library).
+                <img
+                  src={`/api/media/public/${a.rel}`}
+                  alt={a.file}
+                  loading="lazy"
+                  className="aspect-[9/16] w-full object-cover"
+                />
+              ) : (
+                <video
+                  src={`/api/media/public/${a.rel}`}
+                  muted
+                  playsInline
+                  preload="metadata"
+                  className="aspect-[9/16] w-full object-cover"
+                />
+              )}
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <p className="mt-5 text-[10px] uppercase tracking-[0.18em] text-[#a89f8d]">music</p>
+      <div className="mt-2 flex flex-wrap gap-4">
+        {MUSIC_MODES.map((m) => (
+          <label key={m.value} className="flex items-center gap-2 text-sm text-[#f5efe0]">
+            <input
+              type="radio"
+              name="music-mode"
+              aria-label={`music ${m.value}`}
+              className="size-4 accent-[#e8c874]"
+              checked={style.musicMode === m.value}
+              onChange={() => onChange({ musicMode: m.value })}
+            />
+            {m.label}
+          </label>
+        ))}
+      </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <Field label="track">
+          <select
+            aria-label="track"
+            className={selectClass}
+            disabled={style.musicMode !== 'track'}
+            value={style.musicFile ?? ''}
+            onChange={(e) => onChange({ musicFile: e.target.value || null })}
+          >
+            <option value="">— none —</option>
+            {tracks.map((t) => (
+              <option key={t.file} value={t.file}>
+                {t.file}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="add track" hint="mp3 ≤20 MB">
+          <input
+            ref={fileRef}
+            type="file"
+            aria-label="add track"
+            accept=".mp3,audio/mpeg"
+            disabled={uploading}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void upload(f);
+            }}
+            className={`${ghostButtonClass} block w-full cursor-pointer file:mr-3 file:cursor-pointer file:rounded file:border-0 file:bg-[#e8c874]/15 file:px-2 file:py-1 file:text-[#e8c874]`}
+          />
+        </Field>
+      </div>
+
+      {uploading && <p className="mt-2 text-xs text-[#a89f8d]">uploading…</p>}
+      {uploadError && <p className="mt-2 text-sm text-red-400">{uploadError}</p>}
+      {style.musicMode === 'rotation' && <p className="mt-3 text-xs text-[#e8c874]/70">{ROTATION_NOTE}</p>}
+      {style.musicMode === 'track' && tracks.length === 0 && (
+        <p className="mt-3 text-xs text-[#a89f8d]">no tracks in the pool yet — add an mp3 above</p>
+      )}
+    </section>
+  );
+}

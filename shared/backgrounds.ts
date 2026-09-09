@@ -1,9 +1,13 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { IMAGE_EXT } from './background-kind.ts';
 
 export type PoolEntry = { file: string; rel: string; kind: 'clip' | 'image' };
 
-export const IMAGE_EXT = /\.(jpe?g|png|webp)$/i;
+// Re-exported so Node-side callers keep one import site for "everything about backgrounds";
+// browser code must import these from ./background-kind.ts directly — see the note there.
+export { IMAGE_EXT, kenBurnsVariant } from './background-kind.ts';
+
 const CLIP_EXT = /\.(mp4|webm)$/i;
 
 function list(dir: string, ext: RegExp): string[] {
@@ -24,10 +28,4 @@ export function resolveBackground(name: string, pool: PoolEntry[]): PoolEntry {
   const hit = pool.find((p) => p.file === name);
   if (!hit) throw new Error(`background "${name}" not found; available: ${pool.map((p) => p.file).join(', ') || '(none)'}`);
   return hit;
-}
-
-export function kenBurnsVariant(seed: string): 0 | 1 | 2 | 3 {
-  let h = 0x811c9dc5;
-  for (const c of seed) { h ^= c.codePointAt(0)!; h = Math.imul(h, 0x01000193) >>> 0; }
-  return (h % 4) as 0 | 1 | 2 | 3;
 }

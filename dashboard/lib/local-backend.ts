@@ -66,16 +66,35 @@ function repoRoot(): string {
   return REPO_ROOT;
 }
 
+// Backgrounds (clips + images) and music in one list: the Studio's music-mode control needs the
+// mp3 pool the pipeline picks from, and there is no second place to get it from. Consumers that
+// only want backgrounds filter on `kind` (Library, GeneratePanel) — music entries are appended
+// last so the existing background ordering is byte-for-byte unchanged.
 async function listAssets(): Promise<AssetInfo[]> {
   const pool = listBackgroundPool(REPO_ROOT);
   const manifest = await readManifest();
-  return pool.map((p) => {
+  const backgrounds: AssetInfo[] = pool.map((p) => {
     const entry =
       p.kind === 'clip'
         ? manifest.backgrounds.find((e) => e.file === p.file)
         : manifest.images.find((e) => e.file === p.file);
     return { file: p.file, rel: p.rel, kind: p.kind, license: entry?.license ?? '—' };
   });
+
+  const musicDir = join(REPO_ROOT, 'public/assets/music');
+  // Same source of truth the pipeline uses for the music pool (pipeline/run.ts lists this
+  // directory with the same filter), so the Studio's track list can never offer a track the
+  // render would then reject as "not found".
+  const music: AssetInfo[] = (existsSync(musicDir) ? readdirSync(musicDir).filter((f) => /\.mp3$/i.test(f)) : [])
+    .sort()
+    .map((file) => ({
+      file,
+      rel: `assets/music/${file}`,
+      kind: 'music' as const,
+      license: manifest.music.find((e) => e.file === file)?.license ?? '—',
+    }));
+
+  return [...backgrounds, ...music];
 }
 
 // Concurrent uploads must not interleave: two requests racing through slugifyImageName/
@@ -170,7 +189,7 @@ async function getState(): Promise<StateSummary> {
   const [state, config, sources] = await Promise.all([
     readState(join(REPO_ROOT, 'state.json')),
     readFile(join(REPO_ROOT, 'config.json'), 'utf8').then(
-      (s) => JSON.parse(s) as { startRef: string; platforms: PlatformKey[] },
+      (s) => JSON.parse(s) as { handle: string; startRef: string; platforms: PlatformKey[] },
     ),
     readFile(join(REPO_ROOT, 'sources/gita.json'), 'utf8').then((s) => JSON.parse(s) as { verses: Verse[] }),
   ]);
@@ -187,7 +206,10 @@ async function getState(): Promise<StateSummary> {
   const chapters = Array<number>(maxChapter).fill(0);
   for (const v of sources.verses) chapters[v.chapter - 1]++;
 
-  return { lastPosted, nextRef, totalPosted: state.posted.length, chapters };
+  // `handle` is what the render stamps on every card (ReelProps.brand.handle) — the Studio
+  // preview would otherwise have to guess it, and a preview that shows a different handle than
+  // the render is exactly the kind of drift the live preview exists to eliminate.
+  return { lastPosted, nextRef, totalPosted: state.posted.length, chapters, handle: config.handle ?? '' };
 }
 
 async function getVerse(ref: string): Promise<Verse | null> {
