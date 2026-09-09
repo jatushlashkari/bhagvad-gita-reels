@@ -1,0 +1,14 @@
+{
+  "beatFont": "display",
+  "beatSizePx": 64,
+  "textColor": "#ffffff",
+  "accentColor": "#e8c874",
+  "scrimStrength": 0.45,
+  "durationScale": 1,
+  "crossfadeSec": 0.35,
+  "kenBurns": "gentle",
+  "showKicker": true,
+  "showHandle": true,
+  "musicMode": "silent",
+  "musicFile": null
+}

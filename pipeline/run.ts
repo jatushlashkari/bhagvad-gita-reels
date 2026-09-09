@@ -16,13 +16,22 @@ import { postInstagram } from '../post/instagram.ts';
 import { readManifest } from '../scripts/fetch-assets.ts';
 import { listBackgroundPool, resolveBackground, type PoolEntry } from '../shared/backgrounds.ts';
 import { beatsFromTranslation } from '../shared/beats.ts';
+import { DEFAULT_STYLE, validateStyle, type ReelStyle } from '../shared/reel-style.ts';
 import type { ReelProps, Timings, Verse } from '../shared/types.ts';
 
 const STATE_PATH = 'state.json';
 
-export function parseArgs(
-  argv: string[],
-): { verse?: string; dryRun: boolean; background?: string; format?: 'classic' | 'cinema' } {
+export type RunArgs = {
+  verse?: string;
+  dryRun: boolean;
+  background?: string;
+  format?: 'classic' | 'cinema';
+  overrides?: string;
+};
+
+export type Overrides = { beats?: string[]; style?: unknown; music?: string | null };
+
+export function parseArgs(argv: string[]): RunArgs {
   const dryRun = argv.includes('--dry-run');
   const bi = argv.indexOf('--background');
   const background = bi === -1 ? undefined : argv[bi + 1];
@@ -31,12 +40,57 @@ export function parseArgs(
   const format = fi === -1 ? undefined : (argv[fi + 1] as 'classic' | 'cinema');
   if (fi !== -1 && format !== 'classic' && format !== 'cinema')
     throw new Error(`--format must be classic or cinema, got: ${argv[fi + 1] ?? '(none)'}`);
+  const oi = argv.indexOf('--overrides');
+  const overrides = oi === -1 ? undefined : argv[oi + 1];
+  if (oi !== -1 && !overrides) throw new Error('--overrides needs a file path');
   const vi = argv.indexOf('--verse');
-  if (vi === -1) return { dryRun, background, format };
+  if (vi === -1) return { dryRun, background, format, overrides };
   const verse = argv[vi + 1];
   if (!verse || !/^[a-z]+:\d+:\d+$/.test(verse))
     throw new Error(`--verse must have format book:chapter:verse (e.g. gita:2:47), got: ${verse ?? '(none)'}`);
-  return { verse, dryRun, background, format };
+  return { verse, dryRun, background, format, overrides };
+}
+
+/**
+ * Pure merge core for the cinema pipeline's inputs: beats precedence
+ * (overrides > curated > sentence-split fallback), style merge (preset
+ * spread with a raw override layered on top, validated once), and music
+ * selection per the resolved style's musicMode (with a render-time
+ * override that always wins, including an explicit null).
+ */
+export function resolveCinemaInputs(
+  args: RunArgs,
+  curated: string[] | undefined,
+  english: string,
+  preset: ReelStyle,
+  ov: Overrides | null,
+  musicPool: string[],
+  ref: string,
+): { beats: string[]; style: ReelStyle; music: string | null; usedFallbackBeats: boolean } {
+  void args; // reserved for future per-run beat/style overrides driven by CLI flags
+
+  const chosenBeats = ov?.beats ?? curated ?? null;
+  const usedFallbackBeats = chosenBeats === null;
+  const beats = chosenBeats ?? beatsFromTranslation(english);
+
+  const rawStyleOverride = (ov?.style ?? {}) as Record<string, unknown>;
+  const style = validateStyle({ ...preset, ...rawStyleOverride });
+
+  let music: string | null;
+  if (ov && Object.prototype.hasOwnProperty.call(ov, 'music')) {
+    music = ov.music ?? null;
+  } else if (style.musicMode === 'silent') {
+    music = null;
+  } else if (style.musicMode === 'track') {
+    music = style.musicFile && musicPool.includes(style.musicFile) ? style.musicFile : null;
+    if (style.musicFile && music === null) {
+      console.warn(`music track not found: ${style.musicFile} — rendering silent`);
+    }
+  } else {
+    music = musicPool.length ? pickAsset(ref, musicPool) : null;
+  }
+
+  return { beats, style, music, usedFallbackBeats };
 }
 
 function requireEnv(name: string): string {
@@ -112,8 +166,23 @@ async function main(): Promise<void> {
 
   if (format === 'cinema') {
     const beatsFile = JSON.parse(readFileSync('sources/beats.json', 'utf8')) as Record<string, string[]>;
-    const beats = beatsFile[verse.ref] ?? beatsFromTranslation(verse.english);
-    const timings = computeCinemaTimeline(beats);
+    const curated = beatsFile[verse.ref];
+
+    const presetPath = 'styles/cinema.json';
+    const preset = existsSync(presetPath)
+      ? validateStyle(JSON.parse(readFileSync(presetPath, 'utf8')))
+      : DEFAULT_STYLE;
+
+    let ov: Overrides | null = null;
+    if (args.overrides) {
+      if (!existsSync(args.overrides)) throw new Error(`overrides file not found: ${args.overrides}`);
+      ov = JSON.parse(readFileSync(args.overrides, 'utf8')) as Overrides;
+    }
+
+    const r = resolveCinemaInputs(args, curated, verse.english, preset, ov, tracks, verse.ref);
+    const { beats, style } = r;
+    musicFile = r.music;
+    const timings = computeCinemaTimeline(beats, { durationScale: style.durationScale, crossfadeSec: style.crossfadeSec });
     const images = pool.filter((p) => p.kind === 'image');
     const cinemaPool = images.length ? images : pool;
     bgEntry = args.background
@@ -121,12 +190,12 @@ async function main(): Promise<void> {
       : cinemaPool.length
         ? resolveBackground(pickAsset(verse.ref, cinemaPool.map((p) => p.file)), cinemaPool)
         : null;
-    musicFile = tracks.length ? pickAsset(verse.ref, tracks) : null;
     const props: ReelProps = {
       verse,
       timings: computeTimeline({ introDurSec: 3, meaningDurSec: 10, englishText: verse.english }), // unused by CinemaReel; satisfies the shared ReelProps.timings field
       format: 'cinema',
       cinema: { kicker: `GITA ${verse.chapter}.${verse.verse}`, beats, timings },
+      style,
       audio: { introFile: null, meaningFile: null },
       media: { background: bgEntry?.rel ?? null, music: musicFile ? `assets/music/${musicFile}` : null },
       brand: { handle: config.handle },
@@ -135,7 +204,7 @@ async function main(): Promise<void> {
     writeFileSync('out/props.json', JSON.stringify(props, null, 2));
     await renderComposition('CinemaReel');
     console.log(
-      `✔ rendered out/reel.mp4 (${timings.totalSec.toFixed(1)}s, format=cinema, bg=${bgEntry?.file ?? 'gradient'}, music=${musicFile ?? 'none'}, beats=${beats.length}${beatsFile[verse.ref] ? '' : ' [fallback]'})`,
+      `✔ rendered out/reel.mp4 (${timings.totalSec.toFixed(1)}s, format=cinema, bg=${bgEntry?.file ?? 'gradient'}, music=${musicFile ?? 'none'}, beats=${beats.length}${r.usedFallbackBeats ? ' [fallback]' : ''}, style=${ov?.style !== undefined ? 'overridden' : 'preset'})`,
     );
 
     youtubeOverrides = {
