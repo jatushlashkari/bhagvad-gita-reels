@@ -16,12 +16,14 @@ export type ReelStyle = {
   showHandle: boolean;
   musicMode: 'silent' | 'track' | 'rotation';
   musicFile: string | null;
+  promptPrefix: string;
 };
 
 export const DEFAULT_STYLE: ReelStyle = {
   beatFont: 'display', kickerFont: 'serif', beatSizePx: 64, textColor: '#ffffff', accentColor: '#e8c874',
   scrimStrength: 0.45, durationScale: 1, crossfadeSec: 0.35, transition: 'crossfade', gapSec: 0.4, kenBurns: 'gentle',
   showKicker: true, showHandle: true, musicMode: 'silent', musicFile: null,
+  promptPrefix: 'Cinematic devotional painting, ultra-detailed, golden-hour light, deep cosmic blues and gold, reverent mood, no text —',
 };
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
@@ -51,5 +53,6 @@ export function validateStyle(s: unknown): ReelStyle {
     showHandle: bool(o.showHandle, true),
     musicMode: oneOf(o.musicMode, ['silent', 'track', 'rotation'] as const, DEFAULT_STYLE.musicMode),
     musicFile: typeof o.musicFile === 'string' && o.musicFile.length <= 200 ? o.musicFile : null,
+    promptPrefix: typeof o.promptPrefix === 'string' ? o.promptPrefix.trim().slice(0, 200) : DEFAULT_STYLE.promptPrefix,
   };
 }

@@ -44,4 +44,11 @@ describe('validateStyle', () => {
     expect(validateStyle({ gapSec: -1 }).gapSec).toBe(0);
     expect(validateStyle({ transition: 'spin' }).transition).toBe('crossfade');
   });
+  it('promptPrefix defaults, trims, caps at 200 and allows empty', () => {
+    expect(validateStyle({}).promptPrefix).toBe(DEFAULT_STYLE.promptPrefix);
+    expect(validateStyle({ promptPrefix: 42 }).promptPrefix).toBe(DEFAULT_STYLE.promptPrefix);
+    expect(validateStyle({ promptPrefix: '  x  ' }).promptPrefix).toBe('x');
+    expect(validateStyle({ promptPrefix: 'y'.repeat(500) }).promptPrefix).toHaveLength(200);
+    expect(validateStyle({ promptPrefix: '' }).promptPrefix).toBe('');
+  });
 });
