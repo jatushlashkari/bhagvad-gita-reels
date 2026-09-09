@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { execa } from 'execa';
 import {
   ITEM_ID, PLATFORMS, isoToLocal, itemSlug, localDateOf, validateScheduleConfig,
-  type Platform, type PostRecord, type ScheduleConfig, type ScheduleFile, type ScheduleItem,
+  type Platform, type PostRecord, type ScheduleConfig, type ScheduleItem,
 } from '../shared/schedule.ts';
 import { applyPublishResult, creditsFor, duePosts, hookFor, planAutoFill, prefillPosts, type PublishResult } from './schedule-plan.ts';
 import { downloadAsset, loadDotenv, readSchedule, resolveVerse, secretsFor, thumbnail, writeSchedule } from './schedule-io.ts';
@@ -200,14 +200,15 @@ export async function runAutoFill(args: PublisherArgs, io: Io): Promise<void> {
   const sources = readJson<{ verses: Verse[] }>(at(io, 'sources/gita.json'));
   const state = await readState(at(io, 'state.json'));
   const schedulePath = at(io, 'schedule.json');
-  const file = await readSchedule(schedulePath);
-  const plan = planAutoFill(args.now, file.items, verseOrder(sources.verses, config.startRef), state, cfg);
+  const plan = planAutoFill(args.now, (await readSchedule(schedulePath)).items, verseOrder(sources.verses, config.startRef), state, cfg);
 
   for (const { ref, date } of args.days === undefined ? plan : plan.slice(0, args.days)) {
     // One bad render (missing background, TTS hiccup) must not cost the whole run:
     // the row is skipped, logged, and picked up again next hour.
     try {
       const item = await renderRow(ref, date, config.format ?? 'classic', io, { now: args.now });
+      // Re-read after the render (minutes) so rows the dashboard added or edited survive.
+      const file = await readSchedule(schedulePath);
       file.items.push(item);
       await writeSchedule(schedulePath, file);
       io.log(`✔ scheduled ${item.id} (${ref}) for ${date}`);
@@ -249,14 +250,20 @@ async function callPlatform(item: ScheduleItem, platform: Platform, post: PostRe
   }
 }
 
-async function publishAndRecord(file: ScheduleFile, item: ScheduleItem, platform: Platform, args: PublisherArgs, io: Io): Promise<void> {
-  const post = item.posts[platform];
+async function publishAndRecord(itemId: string, platform: Platform, args: PublisherArgs, io: Io): Promise<void> {
+  const schedulePath = at(io, 'schedule.json');
   const now = args.now.toISOString();
 
   // A dry run reports intent and touches nothing — not even the "skipped, no secrets"
   // bookkeeping, which is a real state change the calendar would keep.
   if (args.dryRun) {
-    io.log(`↻ would publish ${item.id} ${platform}`);
+    io.log(`↻ would publish ${itemId} ${platform}`);
+    return;
+  }
+
+  const item = (await readSchedule(schedulePath)).items.find((i) => i.id === itemId);
+  if (!item) {
+    io.log(`✖ ${itemId} ${platform}: row no longer exists`);
     return;
   }
 
@@ -268,33 +275,41 @@ async function publishAndRecord(file: ScheduleFile, item: ScheduleItem, platform
     result = { ok: false, error: 'no asset url (rendered with SCHEDULE_SKIP_RELEASE)' };
   } else {
     try {
-      result = { ok: true, id: await callPlatform(item, platform, post, io) };
+      result = { ok: true, id: await callPlatform(item, platform, item.posts[platform], io) };
     } catch (e) {
       result = { ok: false, error: (e as Error).message };
     }
   }
 
-  // The calendar is rewritten before the next platform is attempted: a crash mid-run
-  // leaves a file that already knows what went out.
-  item.posts[platform] = applyPublishResult(post, result, now);
-  await writeSchedule(at(io, 'schedule.json'), file);
+  // Re-read before writing. A platform call runs for minutes (both Instagram and Facebook
+  // poll for readiness), and the dashboard may have edited another row meanwhile — only
+  // this one post's outcome may be carried into whatever is on disk NOW. Writing after
+  // every result also means a crash mid-run leaves a file that knows what went out.
+  const file = await readSchedule(schedulePath);
+  const fresh = file.items.find((i) => i.id === itemId);
+  if (!fresh) {
+    io.log(`✖ ${itemId} ${platform}: row no longer exists`);
+    return;
+  }
+  fresh.posts[platform] = applyPublishResult(fresh.posts[platform], result, now);
+  await writeSchedule(schedulePath, file);
 
   if ('skipped' in result) {
-    io.log(`↷ skipped ${item.id} ${platform}: ${result.skipped}`);
+    io.log(`↷ skipped ${itemId} ${platform}: ${result.skipped}`);
   } else if (result.ok) {
     const statePath = at(io, 'state.json');
-    await writeState(statePath, recordPost(await readState(statePath), item.ref, platform, result.id, now));
-    io.log(`✔ ${item.id} ${platform} ${result.id}`);
+    await writeState(statePath, recordPost(await readState(statePath), fresh.ref, platform, result.id, now));
+    io.log(`✔ ${itemId} ${platform} ${result.id}`);
   } else {
-    io.log(`✖ ${item.id} ${platform}: ${result.error}`);
+    io.log(`✖ ${itemId} ${platform}: ${result.error}`);
   }
 }
 
 export async function runPublishDue(args: PublisherArgs, io: Io): Promise<void> {
+  // What is due is decided from one snapshot; each result is then applied to a fresh read.
   const file = await readSchedule(at(io, 'schedule.json'));
   for (const due of duePosts(args.now, file.items)) {
-    const item = file.items.find((i) => i.id === due.itemId);
-    if (item) await publishAndRecord(file, item, due.platform, args, io);
+    await publishAndRecord(due.itemId, due.platform, args, io);
   }
 }
 
@@ -305,7 +320,7 @@ export async function runPublishOne(itemId: string, platform: Platform, args: Pu
   const item = file.items.find((i) => i.id === itemId);
   if (!item) throw new Error(`no calendar item ${itemId}`);
   if (item.posts[platform].status === 'published') throw new Error(`${itemId} ${platform} is already published`);
-  await publishAndRecord(file, item, platform, args, io);
+  await publishAndRecord(itemId, platform, args, io);
 }
 
 // A re-render keeps the row's id and posts, so the date is only needed for parity with a
@@ -337,11 +352,11 @@ export async function main(argv: string[]): Promise<void> {
     const add = args.add;
     await requested(`add ${add.ref}`, async () => {
       const { config } = loadConfig(io);
-      const file = await readSchedule(schedulePath);
       const item = await renderRow(add.ref, add.date, add.format ?? config.format ?? 'classic', io, {
         fromLastRender: add.fromLastRender,
         now: args.now,
       });
+      const file = await readSchedule(schedulePath); // read after the render, never across it
       file.items.push(item);
       await writeSchedule(schedulePath, file);
       io.log(`✔ added ${item.id} (${item.ref}) for ${add.date}`);
@@ -352,11 +367,15 @@ export async function main(argv: string[]): Promise<void> {
     const id = args.rerender;
     await requested(`rerender ${id}`, async () => {
       const { cfg } = loadConfig(io);
-      const file = await readSchedule(schedulePath);
-      const existing = file.items.find((i) => i.id === id);
+      const existing = (await readSchedule(schedulePath)).items.find((i) => i.id === id);
       if (!existing) throw new Error(`no calendar item ${id}`);
       const item = await renderRow(existing.ref, itemDate(existing, cfg, args.now), existing.format, io, { existing, now: args.now });
-      file.items = file.items.map((i) => (i.id === id ? item : i));
+      // Re-read after the render: the new asset/thumbnail replace the row, but the posts
+      // come from disk, so a caption edited while the render ran is not clobbered.
+      const file = await readSchedule(schedulePath);
+      const current = file.items.find((i) => i.id === id);
+      if (!current) throw new Error(`no calendar item ${id}`);
+      file.items = file.items.map((i) => (i.id === id ? { ...item, posts: current.posts } : i));
       await writeSchedule(schedulePath, file);
       io.log(`✔ rerendered ${id} (${item.ref})`);
     });

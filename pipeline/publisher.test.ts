@@ -80,7 +80,13 @@ type Fake = {
 
 function fakeIo(
   root: string,
-  opts: { env?: NodeJS.ProcessEnv; failRender?: string; postIds?: Partial<Record<string, string | Error>>; onPost?: (platform: string) => void } = {},
+  opts: {
+    env?: NodeJS.ProcessEnv;
+    failRender?: string;
+    postIds?: Partial<Record<string, string | Error>>;
+    onPost?: (platform: string) => void;
+    onRender?: (ref: string) => void;
+  } = {},
 ): Fake {
   const fake: Fake = {
     root, logs: [], runs: [], itemsOnDiskAtRender: [], thumbs: [], downloads: [], posts: [],
@@ -105,6 +111,7 @@ function fakeIo(
       const format = args[args.indexOf('--format') + 1];
       if (opts.failRender === ref) throw new Error(`render exploded for ${ref}`);
       writeRenderOutput(root, ref, format);
+      opts.onRender?.(ref); // stands in for whatever else touched schedule.json while the render ran
     },
     release: async (ref) => `https://example.com/${ref}.mp4`,
     thumb: async (_video, out) => {
@@ -234,6 +241,20 @@ describe('runAutoFill', () => {
     expect(fake.posts).toEqual([]); // auto-fill never publishes, dry-run or not
   });
 
+  it('a row added while a render was running survives — the calendar is re-read before every write', async () => {
+    const root = makeRoot();
+    const foreign = item('custom-abc-20260915-ffff', 'custom:abc', '2026-09-15');
+    const fake = fakeIo(root, {
+      onRender: () => seed(root, [...readSchedule(root).items, foreign]), // e.g. the dashboard's "Add to calendar"
+    });
+
+    await runAutoFill(args({ autoFill: true, now, days: 1 }), fake.io);
+
+    const { items } = readSchedule(root);
+    expect(items.map((i) => i.ref)).toEqual(['custom:abc', 'gita:1:1']);
+    expect(items[0]).toEqual(foreign);
+  });
+
   it('SCHEDULE_SKIP_RELEASE leaves the asset url empty instead of uploading', async () => {
     const root = makeRoot();
     const fake = fakeIo(root, { env: { SCHEDULE_SKIP_RELEASE: '1' } });
@@ -345,6 +366,29 @@ describe('runPublishDue', () => {
     expect(posts.instagram).toMatchObject({ status: 'failed', attempts: 3, error: 'again' });
     expect(posts.facebook.attempts).toBe(3);
     expect(posts.youtube.id).toBe('yt-old');
+  });
+
+  it('an edit to another row made mid-run survives — the calendar is re-read before every write', async () => {
+    const root = makeRoot();
+    seed(root, [item('gita-1-1-20260912-a1b2', 'gita:1:1', '2026-09-12'), item('gita-1-2-20260913-c3d4', 'gita:1:2', '2026-09-13')]);
+    const fake = fakeIo(root, {
+      env: { ...igEnv, ...fbEnv, ...ytEnv },
+      onPost: (platform) => {
+        if (platform !== 'facebook') return;
+        // the dashboard retimes and rewrites tomorrow's row while this publish is in flight
+        const items = readSchedule(root).items;
+        items[1].posts.instagram.caption = 'edited by the dashboard';
+        items[1].posts.youtube.at = '2026-09-13T04:00:00.000Z';
+        seed(root, items);
+      },
+    });
+
+    await runPublishDue(args({ publishDue: true, now }), fake.io);
+
+    const { items } = readSchedule(root);
+    expect(items[1].posts.instagram.caption).toBe('edited by the dashboard');
+    expect(items[1].posts.youtube.at).toBe('2026-09-13T04:00:00.000Z');
+    expect(Object.values(items[0].posts).map((p) => p.status)).toEqual(['published', 'published', 'published']);
   });
 
   it('--dry-run logs "would publish" and changes nothing', async () => {
