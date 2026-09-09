@@ -55,15 +55,21 @@ export async function postFacebook(
   const videoId = String(start.video_id ?? '');
   if (!videoId) throw new Error(`no video id in ${JSON.stringify(start)}`);
 
-  await fbFetch(fetchImpl, `${FB_UPLOAD}/${videoId}`, {
+  const upload = await fbFetch(fetchImpl, `${FB_UPLOAD}/${videoId}`, {
     method: 'POST',
     headers: facebookUploadHeaders(env.accessToken, videoUrl),
   });
+  // Facebook returns 200 with `{ success: false }` on a rejected upload rather
+  // than a non-2xx status, so `fbFetch`'s ok-check alone can't catch it.
+  if (upload.success !== true) throw new Error(`Facebook upload failed: ${JSON.stringify(upload)}`);
 
-  await fbFetch(fetchImpl, `${FB_GRAPH}/${env.pageId}/video_reels`, {
+  const finish = await fbFetch(fetchImpl, `${FB_GRAPH}/${env.pageId}/video_reels`, {
     method: 'POST',
     body: facebookFinishParams(caption, videoId, env.accessToken),
   });
+  // Same shape of silent failure as the upload step — a 200 with success:false
+  // must not be treated as "the reel was published".
+  if (finish.success !== true) throw new Error(`Facebook finish failed: ${JSON.stringify(finish)}`);
 
   // Facebook processes the uploaded reel asynchronously; only report success
   // once it says the video is ready or the publishing phase is complete.
