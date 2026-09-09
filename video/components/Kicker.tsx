@@ -1,28 +1,34 @@
 import { Easing, interpolate, useCurrentFrame } from 'remotion';
 import { FPS } from '../../shared/types.ts';
+import type { ReelStyle } from '../../shared/reel-style.ts';
 import { LATIN } from '../fonts.ts';
 
-export const Kicker: React.FC<{ text: string; inSec: number; handle: string }> = ({ text, inSec, handle }) => {
+export const Kicker: React.FC<{ text: string; inSec: number; handle: string; style: ReelStyle }> = ({
+  text, inSec, handle, style,
+}) => {
   const t = useCurrentFrame() / FPS;
   const opacity = interpolate(t, [0.2, 0.2 + inSec], [0, 1], {
     extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic),
   });
+  if (!style.showKicker) return null;
   return (
     <>
       <div style={{
         position: 'absolute', top: 150, width: '100%', textAlign: 'center', opacity,
-        fontFamily: LATIN, fontSize: 34, letterSpacing: 14, color: '#e8c874',
+        fontFamily: LATIN, fontSize: 34, letterSpacing: 14, color: style.accentColor,
         textShadow: '0 2px 18px rgba(0,0,0,0.85)',
       }}>
         {text}
       </div>
-      <div style={{
-        position: 'absolute', top: 70, width: '100%', textAlign: 'center', opacity: opacity * 0.75,
-        fontFamily: LATIN, fontSize: 22, letterSpacing: 6, color: '#f5efe0',
-        textShadow: '0 2px 14px rgba(0,0,0,0.85)',
-      }}>
-        {handle}
-      </div>
+      {style.showHandle && (
+        <div style={{
+          position: 'absolute', top: 70, width: '100%', textAlign: 'center', opacity: opacity * 0.75,
+          fontFamily: LATIN, fontSize: 22, letterSpacing: 6, color: '#f5efe0',
+          textShadow: '0 2px 14px rgba(0,0,0,0.85)',
+        }}>
+          {handle}
+        </div>
+      )}
     </>
   );
 };

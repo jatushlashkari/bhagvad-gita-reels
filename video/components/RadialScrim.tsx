@@ -1,8 +1,10 @@
 import { AbsoluteFill } from 'remotion';
-export const RadialScrim: React.FC = () => (
+import type { ReelStyle } from '../../shared/reel-style.ts';
+
+export const RadialScrim: React.FC<{ style: ReelStyle }> = ({ style }) => (
   <AbsoluteFill
     style={{
-      background: 'radial-gradient(ellipse 85% 55% at 50% 52%, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.28) 55%, rgba(0,0,0,0) 100%)',
+      background: `radial-gradient(ellipse 85% 55% at 50% 52%, rgba(0,0,0,${style.scrimStrength}) 0%, rgba(0,0,0,${style.scrimStrength * 0.62}) 55%, rgba(0,0,0,0) 100%)`,
     }}
   />
 );

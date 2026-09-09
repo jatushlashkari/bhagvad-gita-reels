@@ -1,5 +1,6 @@
 import { beatDurationSec } from '../shared/beats.ts';
 import type { Timings, CinemaTimings } from '../shared/types.ts';
+import type { ReelStyle } from '../shared/reel-style.ts';
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
@@ -41,10 +42,14 @@ export function computeTimeline(input: {
   };
 }
 
-export function computeCinemaTimeline(beats: string[]): CinemaTimings {
+export function computeCinemaTimeline(
+  beats: string[],
+  style?: Pick<ReelStyle, 'durationScale' | 'crossfadeSec'>,
+): CinemaTimings {
   if (beats.length < 1) throw new Error('cinema needs at least one beat');
   const kickerInSec = 0.8;
-  const crossfadeSec = 0.35;
+  const crossfadeSec = style?.crossfadeSec ?? 0.35;
+  const durationScale = style?.durationScale ?? 1;
   const closingBase = 3.2;
   let cursor = 1.0;
   const seq = beats.map((b) => {
@@ -67,6 +72,31 @@ export function computeCinemaTimeline(beats: string[]): CinemaTimings {
     closingSec += pad_closing;
     totalSec = 12;
   }
-  if (totalSec > 59.5) throw new TimelineTooLongError(totalSec);
-  return { kickerInSec, beats: seq, crossfadeSec, closingStartSec, closingSec, totalSec };
+  // durationScale stretches/compresses the natural (floor/pad-balanced) per-beat
+  // pacing computed above, re-run through the same crossfade-cascade formula.
+  // Applying it here (rather than to the raw beatDurationSec before the 12s-floor
+  // pass) keeps the floor guarantee meaningful: a single short beat always hits
+  // the floor (its duration is capped at 4.2s, well under the 12s minimum), so
+  // scaling the pre-floor number would be fully absorbed by the padding and never
+  // show up in the output. Scaling the settled duration instead makes the knob
+  // visible in every case, while durationScale=1 reproduces the pre-existing
+  // numbers exactly (identical arithmetic, replayed).
+  let scaledCursor = 1.0;
+  const scaledSeq = seq.map((b) => {
+    const durSec = b.durSec * durationScale;
+    const startSec = scaledCursor;
+    scaledCursor = startSec + durSec - crossfadeSec;
+    return { startSec, durSec };
+  });
+  const scaledClosingStartSec = scaledCursor;
+  const scaledTotalSec = scaledClosingStartSec + closingSec + 0.5;
+  if (scaledTotalSec > 59.5) throw new TimelineTooLongError(scaledTotalSec);
+  return {
+    kickerInSec,
+    beats: scaledSeq,
+    crossfadeSec,
+    closingStartSec: scaledClosingStartSec,
+    closingSec,
+    totalSec: scaledTotalSec,
+  };
 }

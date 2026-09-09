@@ -1,8 +1,11 @@
 import { Easing, interpolate, useCurrentFrame } from 'remotion';
 import { FPS } from '../../shared/types.ts';
-import { DISPLAY } from '../fonts.ts';
+import type { ReelStyle } from '../../shared/reel-style.ts';
+import { DISPLAY, LATIN } from '../fonts.ts';
 
-export const BeatCard: React.FC<{ text: string; durSec: number; fadeSec: number }> = ({ text, durSec, fadeSec }) => {
+export const BeatCard: React.FC<{ text: string; durSec: number; fadeSec: number; style: ReelStyle }> = ({
+  text, durSec, fadeSec, style,
+}) => {
   const t = useCurrentFrame() / FPS;
   const opacity =
     interpolate(t, [0, fadeSec], [0, 1], { extrapolateRight: 'clamp', easing: Easing.out(Easing.quad) }) *
@@ -14,7 +17,8 @@ export const BeatCard: React.FC<{ text: string; durSec: number; fadeSec: number 
       padding: '0 110px', opacity, transform: `translateY(${rise}px)`,
     }}>
       <div style={{
-        fontFamily: DISPLAY, fontSize: 64, lineHeight: 1.28, color: '#ffffff', textAlign: 'center',
+        fontFamily: style.beatFont === 'serif' ? LATIN : DISPLAY, fontSize: style.beatSizePx, lineHeight: 1.28,
+        color: style.textColor, textAlign: 'center',
         textTransform: 'none', textShadow: '0 3px 28px rgba(0,0,0,0.9)',
       }}>
         {text}

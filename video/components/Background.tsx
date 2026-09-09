@@ -1,11 +1,17 @@
-import { AbsoluteFill, Img, Loop, OffthreadVideo, interpolate, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill, Img, Loop, OffthreadVideo, interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
 import { FPS, type ReelProps } from '../../shared/types.ts';
+import type { ReelStyle } from '../../shared/reel-style.ts';
 import { IMAGE_EXT, kenBurnsVariant } from '../../shared/backgrounds.ts';
+import { resolveMedia } from '../media.ts';
 
 // Every background is normalized to exactly 12s/30fps at fetch time (scripts/fetch-assets.ts).
 const BG_CLIP_FRAMES = 12 * FPS;
 
-export const Background: React.FC<{ media: ReelProps['media']; seed: string }> = ({ media, seed }) => {
+const KEN_BURNS_MULTIPLIER: Record<ReelStyle['kenBurns'], number> = { off: 0, gentle: 1, strong: 2 };
+
+export const Background: React.FC<{ media: ReelProps['media']; seed: string; style: ReelStyle }> = ({
+  media, seed, style,
+}) => {
   const frame = useCurrentFrame();
   const t = frame / FPS;
   const isImage = media.background ? IMAGE_EXT.test(media.background) : false;
@@ -13,13 +19,13 @@ export const Background: React.FC<{ media: ReelProps['media']; seed: string }> =
   return (
     <AbsoluteFill>
       {media.background && isImage ? (
-        <KenBurnsImage src={staticFile(media.background)} seed={seed} />
+        <KenBurnsImage src={resolveMedia(media.background)} seed={seed} kenBurns={style.kenBurns} />
       ) : media.background ? (
         // OffthreadVideo: frames are extracted by ffmpeg outside the browser —
         // render tabs never decode video (in-browser decode starved 2-core CI runners).
         <Loop durationInFrames={BG_CLIP_FRAMES}>
           <OffthreadVideo
-            src={staticFile(media.background)}
+            src={resolveMedia(media.background)}
             muted
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
@@ -49,14 +55,17 @@ export const Background: React.FC<{ media: ReelProps['media']; seed: string }> =
   );
 };
 
-const KenBurnsImage: React.FC<{ src: string; seed: string }> = ({ src, seed }) => {
+const KenBurnsImage: React.FC<{ src: string; seed: string; kenBurns: ReelStyle['kenBurns'] }> = ({
+  src, seed, kenBurns,
+}) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
   const v = kenBurnsVariant(seed);
   const t = interpolate(frame, [0, durationInFrames], [0, 1]);
-  const scale = v === 2 ? 1.16 - 0.1 * t : 1.06 + 0.1 * t; // variant 2 zooms out
-  const tx = v === 0 ? -2.5 * t : v === 1 ? 2.5 * t : 0;    // % of width
-  const ty = v === 3 ? -2.0 * t : v === 2 ? 1.5 * t : 0;    // % of height
+  const m = KEN_BURNS_MULTIPLIER[kenBurns];
+  const scale = m === 0 ? 1.08 : v === 2 ? 1.16 - 0.1 * m * t : 1.06 + 0.1 * m * t; // variant 2 zooms out
+  const tx = m === 0 ? 0 : v === 0 ? -2.5 * m * t : v === 1 ? 2.5 * m * t : 0;      // % of width
+  const ty = m === 0 ? 0 : v === 3 ? -2.0 * m * t : v === 2 ? 1.5 * m * t : 0;      // % of height
   return (
     <Img
       src={src}

@@ -61,4 +61,18 @@ describe('computeCinemaTimeline', () => {
   it('rejects empty beats and impossible lengths', () => {
     expect(() => computeCinemaTimeline([])).toThrow(/at least/);
   });
+
+  it('durationScale multiplies per-beat durations', () => {
+    const base = computeCinemaTimeline(['A steady line of text here.']);
+    const fast = computeCinemaTimeline(['A steady line of text here.'], { durationScale: 0.7, crossfadeSec: 0.35 });
+    expect(fast.beats[0].durSec).toBeCloseTo(base.beats[0].durSec * 0.7, 5);
+  });
+  it('crossfadeSec flows into sequencing and output', () => {
+    const t = computeCinemaTimeline(['One line here.', 'Two lines here.'], { durationScale: 1, crossfadeSec: 0.6 });
+    expect(t.crossfadeSec).toBe(0.6);
+    expect(t.beats[1].startSec).toBeCloseTo(t.beats[0].startSec + t.beats[0].durSec - 0.6, 5);
+  });
+  it('no style argument reproduces previous behavior', () => {
+    expect(computeCinemaTimeline(['Do the work. Release the outcome.']).crossfadeSec).toBe(0.35);
+  });
 });

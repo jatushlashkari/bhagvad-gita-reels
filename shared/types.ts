@@ -2,6 +2,8 @@ export const FPS = 30;
 export const WIDTH = 1080;
 export const HEIGHT = 1920;
 
+import type { ReelStyle } from './reel-style.ts';
+
 export type Verse = {
   book: string;                // 'gita'
   ref: string;                 // 'gita:2:47'
@@ -45,4 +47,5 @@ export type ReelProps = {
   brand: { handle: string };
   format?: 'classic' | 'cinema';
   cinema?: { kicker: string; beats: string[]; timings: CinemaTimings };
+  style?: ReelStyle;
 };

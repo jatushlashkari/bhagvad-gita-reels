@@ -1,5 +1,6 @@
 import { AbsoluteFill, Audio, Sequence, interpolate, staticFile, useCurrentFrame } from 'remotion';
 import { FPS, type ReelProps } from '../shared/types.ts';
+import { DEFAULT_STYLE } from '../shared/reel-style.ts';
 import './fonts.ts';
 import { Background } from './components/Background.tsx';
 import { TitleCard } from './components/TitleCard.tsx';
@@ -33,7 +34,7 @@ export const GitaReel: React.FC<ReelProps> = (p) => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#0d0817' }}>
-      <Background media={p.media} seed={`${p.verse.ref}:${p.media.background ?? ''}`} />
+      <Background media={p.media} seed={`${p.verse.ref}:${p.media.background ?? ''}`} style={DEFAULT_STYLE} />
       <TitleCard verse={p.verse} timings={p.timings} />
       <Sequence from={s(p.timings.shlokaStartSec)} durationInFrames={s(p.timings.shlokaSec)}>
         <Shloka lines={p.verse.sanskrit} timings={p.timings} />

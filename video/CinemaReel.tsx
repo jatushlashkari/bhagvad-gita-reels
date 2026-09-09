@@ -1,15 +1,18 @@
-import { AbsoluteFill, Audio, Sequence, interpolate, staticFile, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, Audio, Sequence, interpolate, useCurrentFrame } from 'remotion';
 import { FPS, type ReelProps } from '../shared/types.ts';
+import { validateStyle } from '../shared/reel-style.ts';
 import './fonts.ts';
 import { Background } from './components/Background.tsx';
 import { RadialScrim } from './components/RadialScrim.tsx';
 import { Kicker } from './components/Kicker.tsx';
 import { BeatCard } from './components/BeatCard.tsx';
 import { ClosingCard } from './components/ClosingCard.tsx';
+import { resolveMedia } from './media.ts';
 
 export const CinemaReel: React.FC<ReelProps> = (p) => {
   const frame = useCurrentFrame();
   const c = p.cinema!;
+  const style = validateStyle(p.style);
   const s = (sec: number) => Math.round(sec * FPS);
 
   const musicVolume = (f: number) => {
@@ -25,18 +28,18 @@ export const CinemaReel: React.FC<ReelProps> = (p) => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#0d0817' }}>
-      <Background media={p.media} seed={`${p.verse.ref}:${p.media.background ?? ''}`} />
-      <RadialScrim />
-      <Kicker text={c.kicker} inSec={c.timings.kickerInSec} handle={p.brand.handle} />
+      <Background media={p.media} seed={`${p.verse.ref}:${p.media.background ?? ''}`} style={style} />
+      <RadialScrim style={style} />
+      <Kicker text={c.kicker} inSec={c.timings.kickerInSec} handle={p.brand.handle} style={style} />
       {c.beats.map((b, i) => (
         <Sequence key={i} from={s(c.timings.beats[i].startSec)} durationInFrames={s(c.timings.beats[i].durSec)}>
-          <BeatCard text={b} durSec={c.timings.beats[i].durSec} fadeSec={c.timings.crossfadeSec} />
+          <BeatCard text={b} durSec={c.timings.beats[i].durSec} fadeSec={c.timings.crossfadeSec} style={style} />
         </Sequence>
       ))}
       <Sequence from={s(c.timings.closingStartSec)}>
-        <ClosingCard verse={p.verse} handle={p.brand.handle} />
+        <ClosingCard verse={p.verse} handle={p.brand.handle} style={style} />
       </Sequence>
-      {p.media.music && <Audio src={staticFile(p.media.music)} volume={musicVolume} loop />}
+      {p.media.music && <Audio src={resolveMedia(p.media.music)} volume={musicVolume} loop />}
       <AbsoluteFill style={{ backgroundColor: '#000', opacity: blackout, pointerEvents: 'none' }} />
     </AbsoluteFill>
   );
