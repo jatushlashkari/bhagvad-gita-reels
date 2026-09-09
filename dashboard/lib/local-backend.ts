@@ -17,13 +17,15 @@ import sharp from 'sharp';
 import { listBackgroundPool } from '../../shared/backgrounds.ts';
 import { appendImageEntry, appendMusicEntry, slugifyAudioName, slugifyImageName } from '../../shared/assets-store.ts';
 import { beatsFromTranslation, validateBeatsFile } from '../../shared/beats.ts';
+import { CUSTOM_REF_PREFIX, REF_PATTERN, validateCustomQuote, type CustomQuote } from '../../shared/custom-quotes.ts';
 import { isAllowedMediaPath } from '../../shared/media-path.ts';
+import { promptFor } from '../../shared/prompts.ts';
 import { validateStyle, type ReelStyle } from '../../shared/reel-style.ts';
 import { pickNext, readState, verseOrder, type PlatformKey } from '../../pipeline/select.ts';
 import { loadStylePreset } from '../../pipeline/run.ts';
 import type { Manifest } from '../../scripts/fetch-assets.ts';
 import type { Verse } from '../../shared/types.ts';
-import type { AssetInfo, Backend, MediaHandle, StateSummary } from './backend.ts';
+import type { AssetInfo, Backend, MediaHandle, QuoteRow, StateSummary } from './backend.ts';
 
 export const REPO_ROOT = resolve(process.cwd(), '..');
 
@@ -297,6 +299,106 @@ async function saveBeatsExclusive(ref: string, beats: string[]): Promise<void> {
   await writeFile(BEATS_PATH(), JSON.stringify(merged, null, 2) + '\n');
 }
 
+const PROMPTS_PATH = () => join(REPO_ROOT, 'sources/prompts.json');
+const META_PATH = () => join(REPO_ROOT, 'sources/quotes-meta.json');
+const CUSTOM_PATH = () => join(REPO_ROOT, 'sources/custom-quotes.json');
+
+async function readJson<T>(path: string, fallback: T): Promise<T> {
+  if (!existsSync(path)) return fallback;
+  return JSON.parse(await readFile(path, 'utf8')) as T;
+}
+type QuotesMeta = Record<string, { favorite: boolean }>;
+
+// Joins sources/gita.json with beats/prompts/favorite/style in one pass so the /quotes page and
+// Studio never have to re-read four files themselves; `prompt` here is byte-for-byte what
+// generate() would use for that verse today (same promptFor() call, same style.promptPrefix).
+async function listQuotes(): Promise<QuoteRow[]> {
+  const [sources, beatsFile, prompts, meta, style] = await Promise.all([
+    readJson<{ verses: Verse[] }>(join(REPO_ROOT, 'sources/gita.json'), { verses: [] }),
+    readJson<Record<string, string[]>>(BEATS_PATH(), {}),
+    readJson<Record<string, string>>(PROMPTS_PATH(), {}),
+    readJson<QuotesMeta>(META_PATH(), {}),
+    getStyle(),
+  ]);
+  return sources.verses.map((v) => {
+    const curated = beatsFile[v.ref];
+    const beats = curated ?? beatsFromTranslation(v.english);
+    const hook = beats[0] ?? '';
+    return {
+      ref: v.ref, chapter: v.chapter, verse: v.verse, hook, beats, curated: Boolean(curated),
+      favorite: meta[v.ref]?.favorite ?? false,
+      prompt: promptFor(v.chapter, hook, prompts[v.ref], style.promptPrefix),
+      promptCurated: v.ref in prompts,
+    };
+  });
+}
+
+// Routed through the same `queue` as saveBeats: sources/quotes-meta.json is one shared file
+// across every ref, so two overlapping setFavorite calls race the same read-modify-write.
+function setFavorite(ref: string, favorite: boolean): Promise<void> {
+  const result = queue.then(() => setFavoriteExclusive(ref, favorite));
+  queue = result.then(() => undefined, () => undefined);
+  return result;
+}
+async function setFavoriteExclusive(ref: string, favorite: boolean): Promise<void> {
+  if (!(await getVerse(ref))) throw new Error(`unknown ref ${ref}`);
+  const meta = await readJson<QuotesMeta>(META_PATH(), {});
+  // `false` deletes the key rather than writing `favorite: false`, so the file only ever lists
+  // actual favorites (matching its committed baseline of `{}`).
+  if (favorite) meta[ref] = { favorite: true };
+  else delete meta[ref];
+  await writeFile(META_PATH(), JSON.stringify(meta, null, 2) + '\n');
+}
+
+// A read, not a validator: an unknown ref (verse or custom) resolves to null exactly like "no
+// curated prompt exists yet" rather than throwing — callers want a display value, not an error.
+async function getCuratedPrompt(ref: string): Promise<string | null> {
+  if (ref.startsWith(CUSTOM_REF_PREFIX)) {
+    const q = (await listCustomQuotes()).find((c) => c.id === ref.slice(CUSTOM_REF_PREFIX.length));
+    return q?.prompt || null;
+  }
+  const prompts = await readJson<Record<string, string>>(PROMPTS_PATH(), {});
+  return prompts[ref] ?? null;
+}
+
+async function listCustomQuotes(): Promise<CustomQuote[]> {
+  return readJson<CustomQuote[]>(CUSTOM_PATH(), []);
+}
+// All three writers share `queue` (same read-modify-write hazard as saveBeats).
+function createCustomQuote(input: unknown): Promise<CustomQuote> {
+  const result = queue.then(async () => {
+    const all = await listCustomQuotes();
+    const q = validateCustomQuote(input, all.map((c) => c.id));
+    await writeFile(CUSTOM_PATH(), JSON.stringify([...all, q], null, 2) + '\n');
+    return q;
+  });
+  queue = result.then(() => undefined, () => undefined);
+  return result;
+}
+function updateCustomQuote(id: string, input: unknown): Promise<CustomQuote> {
+  const result = queue.then(async () => {
+    const all = await listCustomQuotes();
+    const i = all.findIndex((c) => c.id === id);
+    if (i === -1) throw new Error(`custom quote "${id}" not found`);
+    const patch = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
+    const q = validateCustomQuote({ ...all[i], ...patch, id, createdAt: all[i].createdAt }, all.filter((c) => c.id !== id).map((c) => c.id));
+    all[i] = q;
+    await writeFile(CUSTOM_PATH(), JSON.stringify(all, null, 2) + '\n');
+    return q;
+  });
+  queue = result.then(() => undefined, () => undefined);
+  return result;
+}
+function deleteCustomQuote(id: string): Promise<void> {
+  const result = queue.then(async () => {
+    const all = await listCustomQuotes();
+    if (!all.some((c) => c.id === id)) throw new Error(`custom quote "${id}" not found`);
+    await writeFile(CUSTOM_PATH(), JSON.stringify(all.filter((c) => c.id !== id), null, 2) + '\n');
+  });
+  queue = result.then(() => undefined, () => undefined);
+  return result;
+}
+
 function errorText(e: unknown): string {
   const err = e as { stdout?: string; stderr?: string; message?: string };
   return [err.stdout, err.stderr, err.message ?? String(e)].filter(Boolean).join('\n');
@@ -316,7 +418,15 @@ async function sync(): Promise<{ ok: boolean; output: string }> {
   try {
     const add = await execa(
       'git',
-      ['add', 'public/assets/images', 'public/assets/manifest.json', 'styles', 'sources/beats.json'],
+      [
+        'add',
+        'public/assets/images',
+        'public/assets/manifest.json',
+        'styles',
+        'sources/beats.json',
+        'sources/quotes-meta.json',
+        'sources/custom-quotes.json',
+      ],
       { cwd: REPO_ROOT },
     );
     log.push(add.stdout, add.stderr);
@@ -332,12 +442,14 @@ async function sync(): Promise<{ ok: boolean; output: string }> {
         [
           'commit',
           '-m',
-          'chore: sync dashboard edits (backgrounds, style, beats)',
+          'chore: sync dashboard edits (backgrounds, style, beats, quotes)',
           '--',
           'public/assets/images',
           'public/assets/manifest.json',
           'styles',
           'sources/beats.json',
+          'sources/quotes-meta.json',
+          'sources/custom-quotes.json',
         ],
         { cwd: REPO_ROOT },
       );
@@ -495,7 +607,7 @@ function generateStream(
   format?: 'classic' | 'cinema',
   overrides?: GenerateOverrides,
 ): ReadableStream<Uint8Array> | 'locked' {
-  if (typeof ref !== 'string' || !/^[a-z]+:\d+:\d+$/.test(ref)) throw new Error('bad ref');
+  if (typeof ref !== 'string' || !REF_PATTERN.test(ref)) throw new Error('bad ref');
   if (background && !isValidBackgroundName(background)) throw new Error('invalid background');
   if (format !== undefined && format !== 'classic' && format !== 'cinema') throw new Error('invalid format');
   if (overrides !== undefined && !isValidOverridesShape(overrides)) throw new Error('invalid overrides');
@@ -614,6 +726,13 @@ export const localBackend: Backend = {
   saveStyle,
   getBeats,
   saveBeats,
+  listQuotes,
+  setFavorite,
+  getCuratedPrompt,
+  listCustomQuotes,
+  createCustomQuote,
+  updateCustomQuote,
+  deleteCustomQuote,
   sync,
   openMedia,
   generate: generateStream,

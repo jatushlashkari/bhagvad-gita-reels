@@ -1,4 +1,5 @@
 import { localBackend } from './local-backend.ts';
+import type { CustomQuote } from '../../shared/custom-quotes.ts';
 import type { ReelStyle } from '../../shared/reel-style.ts';
 import type { Verse } from '../../shared/types.ts';
 
@@ -16,6 +17,7 @@ export type MediaHandle = {
   type: string;
   stream(start?: number, end?: number): ReadableStream<Uint8Array>;
 };
+export type QuoteRow = { ref: string; chapter: number; verse: number; hook: string; beats: string[]; curated: boolean; favorite: boolean; prompt: string; promptCurated: boolean };
 
 export interface Backend {
   repoRoot(): string;
@@ -43,6 +45,32 @@ export interface Backend {
    *  route maps to 400) then rewrites sources/beats.json with this ref's entry set/replaced, keys
    *  kept sorted chapter-then-verse. */
   saveBeats(ref: string, beats: string[]): Promise<void>;
+  /** All 701 verses of sources/gita.json in file order, each row joined with its curated-or-
+   *  fallback beats (mirrors getBeats), favorite flag (sources/quotes-meta.json), and prompt
+   *  (promptFor() over sources/prompts.json's curated body, else the chapter-theme fallback) —
+   *  the one place that assembles what the /quotes page and Studio need without re-joining every
+   *  source file themselves. */
+  listQuotes(): Promise<QuoteRow[]>;
+  /** Sets or clears `ref`'s entry in sources/quotes-meta.json — `favorite: false` deletes the key
+   *  rather than writing `false`, so the file only ever lists actual favorites. Throws on a ref
+   *  that isn't a known verse (custom quotes have no favorite of their own). */
+  setFavorite(ref: string, favorite: boolean): Promise<void>;
+  /** The curated prompt body for `ref`, never the theme/motif fallback: sources/prompts.json[ref]
+   *  for a verse, the custom quote's own `prompt` field for a `custom:` ref, or null when neither
+   *  is set — including for an unknown ref, since this is a display read, not a validator. */
+  getCuratedPrompt(ref: string): Promise<string | null>;
+  listCustomQuotes(): Promise<CustomQuote[]>;
+  /** Validates `input` with shared/custom-quotes.ts's validateCustomQuote (2-6 lines, per-field
+   *  length/emoji limits, defaults for blank attribution/kicker, a minted or caller-supplied id)
+   *  and appends the result to sources/custom-quotes.json; throws the validator's own message on
+   *  a rule violation. */
+  createCustomQuote(input: unknown): Promise<CustomQuote>;
+  /** Merges `input` onto the existing quote — id and createdAt are never overwritten by the patch
+   *  — and re-validates the merged result. Throws 'not found' for an unknown id, else the
+   *  validator's message on a rule violation. */
+  updateCustomQuote(id: string, input: unknown): Promise<CustomQuote>;
+  /** Throws 'not found' for an unknown id. */
+  deleteCustomQuote(id: string): Promise<void>;
   sync(): Promise<{ ok: boolean; output: string }>;
   /** Repo-relative path (already whitelist-checked by the caller) -> size/type/stream, or
    *  null if the path doesn't resolve to a real file. Filesystem access lives here so

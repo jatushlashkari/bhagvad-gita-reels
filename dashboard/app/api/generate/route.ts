@@ -1,5 +1,6 @@
 import { getBackend } from '../../../lib/backend.ts';
 import { assertLocalOrigin } from '../../../lib/assert-local-origin.ts';
+import { REF_PATTERN } from '../../../../shared/custom-quotes.ts';
 
 // Same shape the backend enforces (see local-backend.ts's isValidBackgroundName) — checked here
 // too so a bad value gets a precise 400 before ever reaching the backend/lock, matching the
@@ -57,11 +58,12 @@ export async function POST(req: Request) {
   // truthy value needs to pass the filename/format check.
   const background = rawBackground || undefined;
   const format = rawFormat || undefined;
+  if (typeof ref !== 'string' || !REF_PATTERN.test(ref)) return Response.json({ error: 'invalid ref' }, { status: 400 });
   if (!isValidBackground(background)) return Response.json({ error: 'invalid background' }, { status: 400 });
   if (!isValidFormat(format)) return Response.json({ error: 'invalid format' }, { status: 400 });
   if (!isValidOverrides(overrides)) return Response.json({ error: 'invalid overrides' }, { status: 400 });
   try {
-    const stream = getBackend().generate(ref as string, background, format, overrides);
+    const stream = getBackend().generate(ref, background, format, overrides);
     if (stream === 'locked') return Response.json({ error: 'render already in progress' }, { status: 409 });
     return new Response(stream, { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } });
   } catch (e) {
