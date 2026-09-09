@@ -10,12 +10,16 @@ import {
   cinemaYoutubeTitle,
   cinemaYoutubeDescription,
   cinemaInstagramCaption,
+  customYoutubeTitle,
+  customYoutubeDescription,
+  customInstagramCaption,
 } from '../post/captions.ts';
 import { postYoutube } from '../post/youtube.ts';
 import { postInstagram } from '../post/instagram.ts';
 import { readManifest } from '../scripts/fetch-assets.ts';
 import { listBackgroundPool, resolveBackground, type PoolEntry } from '../shared/backgrounds.ts';
 import { beatsFromTranslation, NO_EMOJI, BEAT_MIN, BEAT_MAX, BEAT_MAX_CHARS } from '../shared/beats.ts';
+import { CUSTOM_REF_PREFIX, REF_PATTERN, placeholderVerse, type CustomQuote } from '../shared/custom-quotes.ts';
 import { DEFAULT_STYLE, validateStyle, type ReelStyle } from '../shared/reel-style.ts';
 import type { ReelProps, Timings, Verse } from '../shared/types.ts';
 
@@ -46,8 +50,8 @@ export function parseArgs(argv: string[]): RunArgs {
   const vi = argv.indexOf('--verse');
   if (vi === -1) return { dryRun, background, format, overrides };
   const verse = argv[vi + 1];
-  if (!verse || !/^[a-z]+:\d+:\d+$/.test(verse))
-    throw new Error(`--verse must have format book:chapter:verse (e.g. gita:2:47), got: ${verse ?? '(none)'}`);
+  if (!verse || !REF_PATTERN.test(verse))
+    throw new Error(`--verse must have format book:chapter:verse (e.g. gita:2:47) or custom:<id>, got: ${verse ?? '(none)'}`);
   return { verse, dryRun, background, format, overrides };
 }
 
@@ -183,6 +187,14 @@ async function renderComposition(id: string): Promise<void> {
   await execa('npx', renderArgs, { stdio: 'inherit' });
 }
 
+function loadCustomQuote(id: string): CustomQuote {
+  const path = 'sources/custom-quotes.json';
+  const quotes = existsSync(path) ? (JSON.parse(readFileSync(path, 'utf8')) as CustomQuote[]) : [];
+  const q = quotes.find((c) => c.id === id);
+  if (!q) throw new Error(`custom quote "${id}" not found (have: ${quotes.map((c) => c.id).join(', ')})`);
+  return q;
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const config = JSON.parse(readFileSync('config.json', 'utf8')) as {
@@ -211,11 +223,13 @@ async function main(): Promise<void> {
     return;
   }
 
-  const verse = sources.verses.find((v) => v.ref === target.ref);
+  const customQuote = args.verse?.startsWith(CUSTOM_REF_PREFIX) ? loadCustomQuote(args.verse.slice(CUSTOM_REF_PREFIX.length)) : null;
+  const verse = customQuote ? placeholderVerse(customQuote) : sources.verses.find((v) => v.ref === target.ref);
   if (!verse) throw new Error(`verse ${target.ref} not in sources`);
   console.log(`▶ ${verse.ref}${args.dryRun ? ' (dry-run)' : ` → ${target.missing.join(', ')}`}`);
 
-  const format: 'classic' | 'cinema' = args.format ?? config.format ?? 'classic';
+  if (customQuote && args.format === 'classic') throw new Error('custom quotes render only in the cinema format');
+  const format: 'classic' | 'cinema' = customQuote ? 'cinema' : (args.format ?? config.format ?? 'classic');
 
   // 2. Deterministic background/music pick (gradient/silence fallback keeps renders unblocked).
   const pool = listBackgroundPool();
@@ -230,7 +244,7 @@ async function main(): Promise<void> {
 
   if (format === 'cinema') {
     const beatsFile = JSON.parse(readFileSync('sources/beats.json', 'utf8')) as Record<string, string[]>;
-    const curated = beatsFile[verse.ref];
+    const curated = customQuote ? customQuote.lines : beatsFile[verse.ref];
 
     const preset = loadStylePreset('styles/cinema.json');
 
@@ -255,7 +269,12 @@ async function main(): Promise<void> {
       verse,
       timings: computeTimeline({ introDurSec: 3, meaningDurSec: 10, englishText: verse.english }), // unused by CinemaReel; satisfies the shared ReelProps.timings field
       format: 'cinema',
-      cinema: { kicker: `GITA ${verse.chapter}.${verse.verse}`, beats, timings },
+      cinema: {
+        kicker: customQuote ? customQuote.kicker : `GITA ${verse.chapter}.${verse.verse}`,
+        beats,
+        timings,
+        ...(customQuote ? { closing: { line: customQuote.attribution, reference: '' } } : {}),
+      },
       style,
       audio: { introFile: null, meaningFile: null },
       media: { background: bgEntry?.rel ?? null, music: musicFile ? `assets/music/${musicFile}` : null },
@@ -268,11 +287,10 @@ async function main(): Promise<void> {
       `✔ rendered out/reel.mp4 (${timings.totalSec.toFixed(1)}s, format=cinema, bg=${bgEntry?.file ?? 'gradient'}, music=${musicFile ?? 'none'}, beats=${beats.length}${r.usedFallbackBeats ? ' [fallback]' : ''}, style=${ov?.style !== undefined ? 'overridden' : 'preset'})`,
     );
 
-    youtubeOverrides = {
-      title: cinemaYoutubeTitle(verse, beats[0]),
-      description: cinemaYoutubeDescription(verse, beats),
-    };
-    instaCaption = cinemaInstagramCaption(verse, beats);
+    youtubeOverrides = customQuote
+      ? { title: customYoutubeTitle(beats[0], customQuote.attribution), description: customYoutubeDescription(beats, customQuote.attribution) }
+      : { title: cinemaYoutubeTitle(verse, beats[0]), description: cinemaYoutubeDescription(verse, beats) };
+    instaCaption = customQuote ? customInstagramCaption(beats, customQuote.attribution) : cinemaInstagramCaption(verse, beats);
   } else {
     // 1. Narration first — the video timeline stretches to fit it.
     mkdirSync('public/generated', { recursive: true });

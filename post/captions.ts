@@ -56,8 +56,7 @@ export function instagramCaption(v: Verse): string {
   return truncate(body, 2200);
 }
 
-export function cinemaYoutubeTitle(v: Verse, hook: string): string {
-  const suffix = ` | Bhagavad Gita ${v.chapter}.${v.verse} #Shorts`;
+function fitTitle(hook: string, suffix: string): string {
   let h = hook;
   const budget = 100 - suffix.length;
   if (h.length > budget) {
@@ -65,6 +64,10 @@ export function cinemaYoutubeTitle(v: Verse, hook: string): string {
     h = h.slice(0, cut > 20 ? cut : budget - 1).trimEnd() + '…';
   }
   return h + suffix;
+}
+
+export function cinemaYoutubeTitle(v: Verse, hook: string): string {
+  return fitTitle(hook, ` | Bhagavad Gita ${v.chapter}.${v.verse} #Shorts`);
 }
 
 export function cinemaYoutubeDescription(v: Verse, beats: string[]): string {
@@ -75,5 +78,18 @@ export function cinemaYoutubeDescription(v: Verse, beats: string[]): string {
 export function cinemaInstagramCaption(v: Verse, beats: string[]): string {
   const body = [beats[0], '', beats.slice(1).join('\n'), '', v.sanskrit.join('\n'), '',
     `(${v.attribution.english})`, '', HASHTAGS.join(' ')].join('\n');
+  return body.length <= 2200 ? body : body.slice(0, 2199) + '…';
+}
+
+export function customYoutubeTitle(hook: string, attribution: string): string {
+  return fitTitle(hook, ` | ${attribution} #Shorts`);
+}
+
+export function customYoutubeDescription(lines: string[], attribution: string): string {
+  return [lines.join('\n'), '', `— ${attribution}`, '', HASHTAGS.join(' ')].join('\n');
+}
+
+export function customInstagramCaption(lines: string[], attribution: string): string {
+  const body = [lines[0], '', lines.slice(1).join('\n'), '', `— ${attribution}`, '', HASHTAGS.join(' ')].join('\n');
   return body.length <= 2200 ? body : body.slice(0, 2199) + '…';
 }

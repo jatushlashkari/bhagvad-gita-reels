@@ -47,6 +47,11 @@ describe('parseArgs', () => {
   it('parseArgs accepts --overrides path', () => {
     expect(parseArgs(['--overrides', 'out/o.json'])).toEqual({ dryRun: false, overrides: 'out/o.json' });
   });
+
+  it('accepts custom refs and rejects malformed ones', () => {
+    expect(parseArgs(['--verse', 'custom:my-quote-1', '--dry-run'])).toEqual({ verse: 'custom:my-quote-1', dryRun: true });
+    expect(() => parseArgs(['--verse', 'custom:..'])).toThrow(/format/);
+  });
 });
 
 describe('resolveCinemaInputs', () => {

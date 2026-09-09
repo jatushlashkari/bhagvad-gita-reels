@@ -37,7 +37,7 @@ export const CinemaReel: React.FC<ReelProps> = (p) => {
         </Sequence>
       ))}
       <Sequence from={s(c.timings.closingStartSec)}>
-        <ClosingCard verse={p.verse} handle={p.brand.handle} style={style} />
+        <ClosingCard verse={p.verse} handle={p.brand.handle} style={style} closing={c.closing} />
       </Sequence>
       {p.media.music && <Audio src={resolveMedia(p.media.music)} volume={musicVolume} loop />}
       <AbsoluteFill style={{ backgroundColor: '#000', opacity: blackout, pointerEvents: 'none' }} />

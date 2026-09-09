@@ -8,6 +8,9 @@ import {
   cinemaYoutubeTitle,
   cinemaYoutubeDescription,
   cinemaInstagramCaption,
+  customYoutubeTitle,
+  customYoutubeDescription,
+  customInstagramCaption,
 } from './captions.ts';
 import type { Verse } from '../shared/types.ts';
 
@@ -77,5 +80,27 @@ describe('cinema captions', () => {
     expect(c.startsWith(beats[0])).toBe(true);
     expect(c.length).toBeLessThanOrEqual(2200);
     expect(c).toContain('#bhagavadgita');
+  });
+});
+
+describe('custom quote captions', () => {
+  it('title = hook | attribution #Shorts, ≤100, word-boundary truncation', () => {
+    expect(customYoutubeTitle('Do the work.', 'श्रीकृष्ण')).toBe('Do the work. | श्रीकृष्ण #Shorts');
+    const long = customYoutubeTitle('word '.repeat(40).trim(), 'Meera Bai');
+    expect(long.length).toBeLessThanOrEqual(100);
+    expect(long.endsWith('… | Meera Bai #Shorts')).toBe(true);
+  });
+  it('description carries every line, the attribution and the hashtags — and no translation line', () => {
+    const d = customYoutubeDescription(['One.', 'Two.'], 'Meera Bai');
+    expect(d).toContain('One.\nTwo.');
+    expect(d).toContain('— Meera Bai');
+    expect(d).toContain('#bhagavadgita');
+    expect(d).not.toMatch(/Translation basis/);
+  });
+  it('instagram caption opens with the hook and stays ≤2200', () => {
+    const c = customInstagramCaption(['One.', 'Two.'], 'Meera Bai');
+    expect(c.startsWith('One.')).toBe(true);
+    expect(c).toContain('— Meera Bai');
+    expect(customInstagramCaption(Array(6).fill('x'.repeat(90)), 'y'.repeat(60)).length).toBeLessThanOrEqual(2200);
   });
 });

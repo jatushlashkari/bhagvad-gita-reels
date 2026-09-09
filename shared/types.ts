@@ -46,6 +46,6 @@ export type ReelProps = {
   media: { background: string | null; music: string | null };      // null = gradient / no music
   brand: { handle: string };
   format?: 'classic' | 'cinema';
-  cinema?: { kicker: string; beats: string[]; timings: CinemaTimings };
+  cinema?: { kicker: string; beats: string[]; timings: CinemaTimings; closing?: { line: string; reference: string } };
   style?: ReelStyle;
 };
