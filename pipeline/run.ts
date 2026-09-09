@@ -15,7 +15,7 @@ import { postYoutube } from '../post/youtube.ts';
 import { postInstagram } from '../post/instagram.ts';
 import { readManifest } from '../scripts/fetch-assets.ts';
 import { listBackgroundPool, resolveBackground, type PoolEntry } from '../shared/backgrounds.ts';
-import { beatsFromTranslation, NO_EMOJI } from '../shared/beats.ts';
+import { beatsFromTranslation, NO_EMOJI, BEAT_MIN, BEAT_MAX, BEAT_MAX_CHARS } from '../shared/beats.ts';
 import { DEFAULT_STYLE, validateStyle, type ReelStyle } from '../shared/reel-style.ts';
 import type { ReelProps, Timings, Verse } from '../shared/types.ts';
 
@@ -51,8 +51,6 @@ export function parseArgs(argv: string[]): RunArgs {
   return { verse, dryRun, background, format, overrides };
 }
 
-const MAX_OVERRIDE_BEATS = 6;
-const MAX_BEAT_LEN = 90;
 
 // --overrides is a CLI surface in its own right (not only the dashboard's
 // generated-form input), so a hand-edited or scripted overrides file gets the
@@ -62,8 +60,8 @@ function assertValidOverrideBeat(beat: unknown): asserts beat is string {
   if (typeof beat !== 'string') {
     throw new Error(`override beat is not a string: ${JSON.stringify(beat)}`);
   }
-  if (beat.length > MAX_BEAT_LEN) {
-    throw new Error(`override beat exceeds ${MAX_BEAT_LEN} chars: "${beat.slice(0, 40)}…"`);
+  if (beat.length > BEAT_MAX_CHARS) {
+    throw new Error(`override beat exceeds ${BEAT_MAX_CHARS} chars: "${beat.slice(0, 40)}…"`);
   }
   if (NO_EMOJI.test(beat)) {
     throw new Error(`override beat contains emoji: "${beat}"`);
@@ -93,8 +91,11 @@ export function resolveCinemaInputs(
   // the same as an absent key and fall through to curated/fallback beats.
   const overrideBeats = ov?.beats && ov.beats.length > 0 ? ov.beats : undefined;
   if (overrideBeats) {
-    if (overrideBeats.length > MAX_OVERRIDE_BEATS) {
-      throw new Error(`override beats has ${overrideBeats.length} entries (max ${MAX_OVERRIDE_BEATS})`);
+    if (overrideBeats.length < BEAT_MIN) {
+      throw new Error(`override beats needs at least ${BEAT_MIN} entries, got ${overrideBeats.length}`);
+    }
+    if (overrideBeats.length > BEAT_MAX) {
+      throw new Error(`override beats has ${overrideBeats.length} entries (max ${BEAT_MAX})`);
     }
     for (const beat of overrideBeats) assertValidOverrideBeat(beat);
   }

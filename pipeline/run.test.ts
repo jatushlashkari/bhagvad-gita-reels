@@ -22,6 +22,20 @@ describe('parseArgs', () => {
     expect(parseArgs(['--background', 'krishna.jpg'])).toEqual({ dryRun: false, background: 'krishna.jpg' });
   });
 
+  it('rejects a single-entry beats override (min 2, matching persisted rules)', () => {
+    expect(() =>
+      resolveCinemaInputs(
+        { verse: undefined, dryRun: true, background: undefined, format: 'cinema', overrides: undefined },
+        undefined,
+        'One sentence. Two sentences.',
+        DEFAULT_STYLE,
+        { beats: ['Only one beat.'] },
+        [],
+        'gita:1:1',
+      ),
+    ).toThrow(/at least 2/);
+  });
+
   it('parses a format override', () => {
     expect(parseArgs(['--format', 'cinema'])).toEqual({ dryRun: false, format: 'cinema' });
   });
@@ -72,7 +86,7 @@ describe('resolveCinemaInputs', () => {
 
   it('override beat containing emoji throws, naming the offending beat', () => {
     expect(() =>
-      resolveCinemaInputs(base, undefined, 'x. y.', DEFAULT_STYLE, { beats: ['Nice beat 🙏.'] }, [], 'gita:1:1'),
+      resolveCinemaInputs(base, undefined, 'x. y.', DEFAULT_STYLE, { beats: ['Clean beat.', 'Nice beat 🙏.'] }, [], 'gita:1:1'),
     ).toThrow(/Nice beat/);
   });
 

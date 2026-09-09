@@ -1,10 +1,11 @@
 'use client';
-import { NO_EMOJI } from '../../../../shared/beats.ts';
+import { BEAT_MAX, BEAT_MIN, BEAT_MAX_CHARS, NO_EMOJI } from '../../../../shared/beats.ts';
 import { buttonClass, headingClass, iconButtonClass, panelClass } from './ui.tsx';
 
-export const MAX_BEATS = 6;
-export const MIN_BEATS = 2;
-export const MAX_BEAT_CHARS = 90;
+// Single-sourced from shared/beats.ts so UI, API, and CLI can never drift.
+export const MAX_BEATS = BEAT_MAX;
+export const MIN_BEATS = BEAT_MIN;
+export const MAX_BEAT_CHARS = BEAT_MAX_CHARS;
 
 /**
  * The client-side mirror of `validateBeatsFile`'s per-entry rules (shared/beats.ts), so an edit
