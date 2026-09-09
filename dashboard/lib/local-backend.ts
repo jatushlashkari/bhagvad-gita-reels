@@ -201,7 +201,21 @@ async function getStyle(): Promise<ReelStyle> {
   return loadStylePreset(STYLE_PATH());
 }
 
-async function saveStyle(s: unknown): Promise<ReelStyle> {
+// Routed through the same `queue` as saveImage/saveAudio: styles/cinema.json is a single shared
+// file, and without serialization two overlapping POST /api/style calls (or a style save racing
+// a beats save's own read-modify-write below) could interleave and silently drop one writer's
+// update. This has no resize/slug step, but the queue+Exclusive split is kept identical to the
+// upload functions' shape so every shared-file writer follows the same pattern.
+function saveStyle(s: unknown): Promise<ReelStyle> {
+  const result = queue.then(() => saveStyleExclusive(s));
+  queue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
+async function saveStyleExclusive(s: unknown): Promise<ReelStyle> {
   const style = validateStyle(s);
   await writeFile(STYLE_PATH(), JSON.stringify(style, null, 2) + '\n');
   return style;
@@ -235,7 +249,20 @@ function sortBeatsKeys(beats: Record<string, string[]>): Record<string, string[]
   return sorted;
 }
 
-async function saveBeats(ref: string, beats: string[]): Promise<void> {
+// Routed through the same `queue` as saveImage/saveAudio/saveStyle: sources/beats.json is one
+// shared file across every ref, so two overlapping saveBeats calls — even for two *different*
+// refs — race the same read-modify-write and can silently drop one edit. Serializing here closes
+// that window exactly the way the upload functions already close it for the manifest.
+function saveBeats(ref: string, beats: string[]): Promise<void> {
+  const result = queue.then(() => saveBeatsExclusive(ref, beats));
+  queue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
+async function saveBeatsExclusive(ref: string, beats: string[]): Promise<void> {
   const sources = JSON.parse(await readFile(join(REPO_ROOT, 'sources/gita.json'), 'utf8')) as { verses: Verse[] };
   const verseRefs = new Set(sources.verses.map((v) => v.ref));
   // Validates only the changed entry (ref known, 2-6 lines, ≤90 chars, no emoji) — not the whole
