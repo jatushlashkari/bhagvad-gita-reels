@@ -88,18 +88,23 @@ function padClosingToFloor(closingSec: number, totalSec: number): { closingSec: 
 
 export function computeCinemaTimeline(
   beats: string[],
-  style?: Pick<ReelStyle, 'durationScale' | 'crossfadeSec'>,
+  style?: Pick<ReelStyle, 'durationScale' | 'crossfadeSec' | 'transition' | 'gapSec'>,
 ): CinemaTimings {
   if (beats.length < 1) throw new Error('cinema needs at least one beat');
   const kickerInSec = 0.8;
   const crossfadeSec = style?.crossfadeSec ?? 0.35;
   const durationScale = style?.durationScale ?? 1;
+  const transition = style?.transition ?? 'crossfade';
+  const gapSec = style?.gapSec ?? 0.4;
+  // Crossfade overlaps the next beat by the fade length; sequential lets the beat fade fully out,
+  // holds the image alone for gapSec, then starts the next beat — no overlap (spec §3).
+  const advance = (durSec: number) => (transition === 'sequential' ? durSec + gapSec : durSec - crossfadeSec);
   const closingBase = 3.2;
   let cursor = 1.0;
   const seq = beats.map((b) => {
     const durSec = beatDurationSec(b);
     const startSec = cursor;
-    cursor = startSec + durSec - crossfadeSec;
+    cursor = startSec + advance(durSec);
     return { startSec, durSec };
   });
   const natural = padToFloor(seq, cursor, closingBase, cursor + closingBase + 0.5);
@@ -117,7 +122,7 @@ export function computeCinemaTimeline(
   const scaledSeq = natural.seq.map((b) => {
     const durSec = b.durSec * durationScale;
     const startSec = scaledCursor;
-    scaledCursor = startSec + durSec - crossfadeSec;
+    scaledCursor = startSec + advance(durSec);
     return { startSec, durSec };
   });
   const scaledClosingStartSec = scaledCursor;

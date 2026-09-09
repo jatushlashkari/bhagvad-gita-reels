@@ -37,4 +37,11 @@ describe('validateStyle', () => {
     expect(validateStyle({ kickerFont: 'cinzel' }).kickerFont).toBe('cinzel');
     expect(validateStyle({ kickerFont: 'bebas' }).kickerFont).toBe('serif');
   });
+  it('transition + gap tokens default and clamp', () => {
+    expect(validateStyle({}).transition).toBe('crossfade');
+    expect(validateStyle({}).gapSec).toBe(0.4);
+    expect(validateStyle({ transition: 'sequential', gapSec: 9 }).gapSec).toBe(1.5);
+    expect(validateStyle({ gapSec: -1 }).gapSec).toBe(0);
+    expect(validateStyle({ transition: 'spin' }).transition).toBe('crossfade');
+  });
 });

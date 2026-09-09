@@ -64,11 +64,11 @@ describe('computeCinemaTimeline', () => {
 
   it('durationScale multiplies per-beat durations', () => {
     const base = computeCinemaTimeline(['A steady line of text here.']);
-    const fast = computeCinemaTimeline(['A steady line of text here.'], { durationScale: 0.7, crossfadeSec: 0.35 });
+    const fast = computeCinemaTimeline(['A steady line of text here.'], { durationScale: 0.7, crossfadeSec: 0.35, transition: 'crossfade', gapSec: 0.4 });
     expect(fast.beats[0].durSec).toBeCloseTo(base.beats[0].durSec * 0.7, 5);
   });
   it('crossfadeSec flows into sequencing and output', () => {
-    const t = computeCinemaTimeline(['One line here.', 'Two lines here.'], { durationScale: 1, crossfadeSec: 0.6 });
+    const t = computeCinemaTimeline(['One line here.', 'Two lines here.'], { durationScale: 1, crossfadeSec: 0.6, transition: 'crossfade', gapSec: 0.4 });
     expect(t.crossfadeSec).toBe(0.6);
     expect(t.beats[1].startSec).toBeCloseTo(t.beats[0].startSec + t.beats[0].durSec - 0.6, 5);
   });
@@ -77,11 +77,39 @@ describe('computeCinemaTimeline', () => {
   });
 
   it('12s floor holds under durationScale < 1 (floor-triggering and non-floor pre-scale cases)', () => {
-    const a = computeCinemaTimeline(['Short one.'], { durationScale: 0.7, crossfadeSec: 0.35 });
+    const a = computeCinemaTimeline(['Short one.'], { durationScale: 0.7, crossfadeSec: 0.35, transition: 'crossfade', gapSec: 0.4 });
     expect(a.totalSec).toBeGreaterThanOrEqual(12);
-    const b = computeCinemaTimeline(['One line here.', 'Two lines more.', 'Three lines yet.'], { durationScale: 0.7, crossfadeSec: 0.35 });
+    const b = computeCinemaTimeline(['One line here.', 'Two lines more.', 'Three lines yet.'], { durationScale: 0.7, crossfadeSec: 0.35, transition: 'crossfade', gapSec: 0.4 });
     expect(b.totalSec).toBeGreaterThanOrEqual(12);
     for (const t of [a, b]) for (let i = 1; i < t.beats.length; i++)
       expect(t.beats[i].startSec).toBeCloseTo(t.beats[i-1].startSec + t.beats[i-1].durSec - t.crossfadeSec, 5);
+  });
+});
+
+describe('computeCinemaTimeline sequential mode', () => {
+  const beats = ['One line here for the first beat.', 'Two lines here, second beat.', 'Three lines here, third beat.'];
+  const seq = { durationScale: 1, crossfadeSec: 0.35, transition: 'sequential' as const, gapSec: 0.5 };
+
+  it('no overlap: each beat starts a gap after the previous one ends; closing after the last gap', () => {
+    const t = computeCinemaTimeline(beats, seq);
+    for (let i = 1; i < t.beats.length; i++)
+      expect(t.beats[i].startSec).toBeCloseTo(t.beats[i - 1].startSec + t.beats[i - 1].durSec + 0.5, 5);
+    const last = t.beats[t.beats.length - 1];
+    expect(t.closingStartSec).toBeCloseTo(last.startSec + last.durSec + 0.5, 5);
+  });
+
+  it('crossfade mode is byte-identical with the new tokens present', () => {
+    expect(computeCinemaTimeline(beats, { durationScale: 1, crossfadeSec: 0.35, transition: 'crossfade', gapSec: 0.4 }))
+      .toEqual(computeCinemaTimeline(beats));
+  });
+
+  it('sequential mode is longer than crossfade for the same beats', () => {
+    expect(computeCinemaTimeline(beats, seq).totalSec).toBeGreaterThan(computeCinemaTimeline(beats).totalSec);
+  });
+
+  it('sequential mode keeps the 12s floor and the no-overlap rule after durationScale', () => {
+    const t = computeCinemaTimeline(['Short one.', 'Short two.'], { ...seq, durationScale: 0.7, gapSec: 1.5 });
+    expect(t.totalSec).toBeGreaterThanOrEqual(12);
+    expect(t.beats[1].startSec).toBeCloseTo(t.beats[0].startSec + t.beats[0].durSec + 1.5, 5);
   });
 });

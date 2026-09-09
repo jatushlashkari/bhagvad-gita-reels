@@ -137,10 +137,7 @@ export default function StudioPage() {
   const preview = useMemo<{ props: ReelProps | null; totalSec: number; error: string | null }>(() => {
     if (!verse) return { props: null, totalSec: 0, error: null };
     try {
-      const timings = computeCinemaTimeline(liveBeats, {
-        durationScale: style.durationScale,
-        crossfadeSec: style.crossfadeSec,
-      });
+      const timings = computeCinemaTimeline(liveBeats, style);
       const props: ReelProps = {
         verse,
         // Unused by CinemaReel, required by the shared ReelProps — built exactly as

@@ -66,6 +66,18 @@ export function StyleControls({
           </select>
         </Field>
 
+        <Field label="transition">
+          <select
+            aria-label="transition"
+            className={selectClass}
+            value={style.transition}
+            onChange={(e) => onChange({ transition: e.target.value as ReelStyle['transition'] })}
+          >
+            <option value="crossfade">Crossfade (overlap)</option>
+            <option value="sequential">Sequential (fade out, gap, fade in)</option>
+          </select>
+        </Field>
+
         <Field label="text colour">
           <input
             type="color"
@@ -114,13 +126,23 @@ export function StyleControls({
           onChange={(durationScale) => onChange({ durationScale })}
         />
         <Slider
-          label="crossfade"
+          label="fade"
           min={0.2}
           max={0.8}
           step={0.05}
           value={style.crossfadeSec}
           onChange={(crossfadeSec) => onChange({ crossfadeSec })}
         />
+        {style.transition === 'sequential' && (
+          <Slider
+            label="gap"
+            min={0}
+            max={1.5}
+            step={0.05}
+            value={style.gapSec}
+            onChange={(gapSec) => onChange({ gapSec })}
+          />
+        )}
       </div>
 
       <div className="mt-4 flex flex-wrap gap-5">

@@ -9,6 +9,8 @@ export type ReelStyle = {
   scrimStrength: number;
   durationScale: number;
   crossfadeSec: number;
+  transition: 'crossfade' | 'sequential';
+  gapSec: number;
   kenBurns: 'off' | 'gentle' | 'strong';
   showKicker: boolean;
   showHandle: boolean;
@@ -18,7 +20,7 @@ export type ReelStyle = {
 
 export const DEFAULT_STYLE: ReelStyle = {
   beatFont: 'display', kickerFont: 'serif', beatSizePx: 64, textColor: '#ffffff', accentColor: '#e8c874',
-  scrimStrength: 0.45, durationScale: 1, crossfadeSec: 0.35, kenBurns: 'gentle',
+  scrimStrength: 0.45, durationScale: 1, crossfadeSec: 0.35, transition: 'crossfade', gapSec: 0.4, kenBurns: 'gentle',
   showKicker: true, showHandle: true, musicMode: 'silent', musicFile: null,
 };
 
@@ -42,6 +44,8 @@ export function validateStyle(s: unknown): ReelStyle {
     scrimStrength: num(o.scrimStrength, DEFAULT_STYLE.scrimStrength, 0, 1),
     durationScale: num(o.durationScale, DEFAULT_STYLE.durationScale, 0.7, 1.5),
     crossfadeSec: num(o.crossfadeSec, DEFAULT_STYLE.crossfadeSec, 0.2, 0.8),
+    transition: oneOf(o.transition, ['crossfade', 'sequential'] as const, DEFAULT_STYLE.transition),
+    gapSec: num(o.gapSec, DEFAULT_STYLE.gapSec, 0, 1.5),
     kenBurns: oneOf(o.kenBurns, ['off', 'gentle', 'strong'] as const, DEFAULT_STYLE.kenBurns),
     showKicker: bool(o.showKicker, true),
     showHandle: bool(o.showHandle, true),

@@ -243,7 +243,7 @@ async function main(): Promise<void> {
     const r = resolveCinemaInputs(args, curated, verse.english, preset, ov, tracks, verse.ref);
     const { beats, style } = r;
     musicFile = r.music;
-    const timings = computeCinemaTimeline(beats, { durationScale: style.durationScale, crossfadeSec: style.crossfadeSec });
+    const timings = computeCinemaTimeline(beats, style);
     const images = pool.filter((p) => p.kind === 'image');
     const cinemaPool = images.length ? images : pool;
     bgEntry = args.background
