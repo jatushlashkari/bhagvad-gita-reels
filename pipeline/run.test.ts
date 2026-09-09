@@ -17,4 +17,12 @@ describe('parseArgs', () => {
   it('parses a background override', () => {
     expect(parseArgs(['--background', 'krishna.jpg'])).toEqual({ dryRun: false, background: 'krishna.jpg' });
   });
+
+  it('parses a format override', () => {
+    expect(parseArgs(['--format', 'cinema'])).toEqual({ dryRun: false, format: 'cinema' });
+  });
+
+  it('rejects unknown formats', () => {
+    expect(() => parseArgs(['--format', 'fancy'])).toThrow(/classic|cinema/);
+  });
 });

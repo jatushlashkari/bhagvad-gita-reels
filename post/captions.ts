@@ -55,3 +55,25 @@ export function instagramCaption(v: Verse): string {
   ].join('\n');
   return truncate(body, 2200);
 }
+
+export function cinemaYoutubeTitle(v: Verse, hook: string): string {
+  const suffix = ` | Bhagavad Gita ${v.chapter}.${v.verse} #Shorts`;
+  let h = hook;
+  const budget = 100 - suffix.length;
+  if (h.length > budget) {
+    const cut = h.lastIndexOf(' ', budget - 1);
+    h = h.slice(0, cut > 20 ? cut : budget - 1).trimEnd() + '…';
+  }
+  return h + suffix;
+}
+
+export function cinemaYoutubeDescription(v: Verse, beats: string[]): string {
+  return [beats.join('\n'), '', v.sanskrit.join('\n'), '',
+    `Translation basis: ${v.attribution.english}`, '', HASHTAGS.join(' ')].join('\n');
+}
+
+export function cinemaInstagramCaption(v: Verse, beats: string[]): string {
+  const body = [beats[0], '', beats.slice(1).join('\n'), '', v.sanskrit.join('\n'), '',
+    `(${v.attribution.english})`, '', HASHTAGS.join(' ')].join('\n');
+  return body.length <= 2200 ? body : body.slice(0, 2199) + '…';
+}

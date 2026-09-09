@@ -13,4 +13,8 @@ describe('reelContainerParams', () => {
   it('graph base is instagram.com (Instagram Login API, not facebook.com)', () => {
     expect(IG_GRAPH).toContain('graph.instagram.com');
   });
+
+  it('container params carry a custom caption verbatim', () => {
+    expect(reelContainerParams('custom caption', 'https://x/y.mp4').get('caption')).toBe('custom caption');
+  });
 });

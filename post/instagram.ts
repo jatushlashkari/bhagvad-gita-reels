@@ -22,8 +22,13 @@ async function igFetch(url: string, init?: RequestInit): Promise<Record<string, 
   return body;
 }
 
-export async function postInstagram(v: Verse, videoUrl: string, env: InstagramEnv): Promise<string> {
-  const params = reelContainerParams(instagramCaption(v), videoUrl);
+export async function postInstagram(
+  v: Verse,
+  videoUrl: string,
+  env: InstagramEnv,
+  caption?: string,
+): Promise<string> {
+  const params = reelContainerParams(caption ?? instagramCaption(v), videoUrl);
   params.set('access_token', env.accessToken);
   const container = await igFetch(`${IG_GRAPH}/${env.userId}/media`, { method: 'POST', body: params });
   const containerId = String(container.id ?? '');

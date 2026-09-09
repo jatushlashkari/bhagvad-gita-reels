@@ -1,30 +1,42 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
 import { execa } from 'execa';
-import { computeTimeline, TimelineTooLongError } from './timeline.ts';
+import { computeTimeline, computeCinemaTimeline, TimelineTooLongError } from './timeline.ts';
 import { pickAsset } from './pick.ts';
 import { pickNext, recordPost, readState, writeState, verseOrder, type PlatformKey } from './select.ts';
 import { publishReleaseAsset } from './release.ts';
 import { synthHindi } from '../voice/tts.ts';
-import { introText } from '../post/captions.ts';
+import {
+  introText,
+  cinemaYoutubeTitle,
+  cinemaYoutubeDescription,
+  cinemaInstagramCaption,
+} from '../post/captions.ts';
 import { postYoutube } from '../post/youtube.ts';
 import { postInstagram } from '../post/instagram.ts';
 import { readManifest } from '../scripts/fetch-assets.ts';
-import { listBackgroundPool, resolveBackground } from '../shared/backgrounds.ts';
+import { listBackgroundPool, resolveBackground, type PoolEntry } from '../shared/backgrounds.ts';
+import { beatsFromTranslation } from '../shared/beats.ts';
 import type { ReelProps, Timings, Verse } from '../shared/types.ts';
 
 const STATE_PATH = 'state.json';
 
-export function parseArgs(argv: string[]): { verse?: string; dryRun: boolean; background?: string } {
+export function parseArgs(
+  argv: string[],
+): { verse?: string; dryRun: boolean; background?: string; format?: 'classic' | 'cinema' } {
   const dryRun = argv.includes('--dry-run');
   const bi = argv.indexOf('--background');
   const background = bi === -1 ? undefined : argv[bi + 1];
   if (bi !== -1 && !background) throw new Error('--background needs a file name');
+  const fi = argv.indexOf('--format');
+  const format = fi === -1 ? undefined : (argv[fi + 1] as 'classic' | 'cinema');
+  if (fi !== -1 && format !== 'classic' && format !== 'cinema')
+    throw new Error(`--format must be classic or cinema, got: ${argv[fi + 1] ?? '(none)'}`);
   const vi = argv.indexOf('--verse');
-  if (vi === -1) return { dryRun, background };
+  if (vi === -1) return { dryRun, background, format };
   const verse = argv[vi + 1];
   if (!verse || !/^[a-z]+:\d+:\d+$/.test(verse))
     throw new Error(`--verse must have format book:chapter:verse (e.g. gita:2:47), got: ${verse ?? '(none)'}`);
-  return { verse, dryRun, background };
+  return { verse, dryRun, background, format };
 }
 
 function requireEnv(name: string): string {
@@ -47,12 +59,19 @@ function listAssets(dir: string, exts: RegExp): string[] {
   return readdirSync(dir).filter((f) => exts.test(f));
 }
 
+async function renderComposition(id: string): Promise<void> {
+  const renderArgs = ['remotion', 'render', 'video/index.ts', id, 'out/reel.mp4', '--props=out/props.json'];
+  if (process.env.REMOTION_VERBOSE) renderArgs.push('--log=verbose');
+  await execa('npx', renderArgs, { stdio: 'inherit' });
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const config = JSON.parse(readFileSync('config.json', 'utf8')) as {
     handle: string;
     startRef: string;
     platforms: PlatformKey[];
+    format?: 'classic' | 'cinema';
   };
   const sources = JSON.parse(readFileSync('sources/gita.json', 'utf8')) as { verses: Verse[] };
   const state = await readState(STATE_PATH);
@@ -78,64 +97,105 @@ async function main(): Promise<void> {
   if (!verse) throw new Error(`verse ${target.ref} not in sources`);
   console.log(`▶ ${verse.ref}${args.dryRun ? ' (dry-run)' : ` → ${target.missing.join(', ')}`}`);
 
-  // 1. Narration first — the video timeline stretches to fit it.
-  mkdirSync('public/generated', { recursive: true });
-  const intro = await retryOnce('intro TTS', () =>
-    synthHindi(introText(verse), 'public/generated/intro.mp3'),
-  );
-  let meaning = await retryOnce('meaning TTS', () =>
-    synthHindi(verse.hindi, 'public/generated/meaning.mp3'),
-  );
-  let timings: Timings;
-  try {
-    timings = computeTimeline({
-      introDurSec: intro.durationSec,
-      meaningDurSec: meaning.durationSec,
-      englishText: verse.english,
-    });
-  } catch (e) {
-    if (!(e instanceof TimelineTooLongError)) throw e;
-    console.warn(`reel too long (${e.totalSec.toFixed(1)}s); retrying narration 15% faster`);
-    meaning = await retryOnce('faster meaning TTS', () =>
-      synthHindi(verse.hindi, 'public/generated/meaning.mp3', { rate: '+15%' }),
-    );
-    timings = computeTimeline({
-      introDurSec: intro.durationSec,
-      meaningDurSec: meaning.durationSec,
-      englishText: verse.english,
-    });
-  }
+  const format: 'classic' | 'cinema' = args.format ?? config.format ?? 'classic';
 
   // 2. Deterministic background/music pick (gradient/silence fallback keeps renders unblocked).
   const pool = listBackgroundPool();
   const tracks = listAssets('public/assets/music', /\.mp3$/i);
   if (pool.length === 0) console.warn('no backgrounds — using gradient (run: npm run assets)');
   if (tracks.length === 0) console.warn('no music — rendering silent (run: npm run assets)');
-  const bgEntry = args.background
-    ? resolveBackground(args.background, pool)
-    : pool.length
-      ? resolveBackground(pickAsset(verse.ref, pool.map((p) => p.file)), pool)
-      : null;
-  const musicFile = tracks.length ? pickAsset(verse.ref, tracks) : null;
 
-  const props: ReelProps = {
-    verse,
-    timings,
-    audio: { introFile: 'generated/intro.mp3', meaningFile: 'generated/meaning.mp3' },
-    media: {
-      background: bgEntry?.rel ?? null,
-      music: musicFile ? `assets/music/${musicFile}` : null,
-    },
-    brand: { handle: config.handle },
-  };
-  mkdirSync('out', { recursive: true });
-  writeFileSync('out/props.json', JSON.stringify(props, null, 2));
+  let bgEntry: PoolEntry | null = null;
+  let musicFile: string | null = null;
+  let youtubeOverrides: { title: string; description: string } | undefined;
+  let instaCaption: string | undefined;
 
-  // 3. Render.
-  const renderArgs = ['remotion', 'render', 'video/index.ts', 'GitaReel', 'out/reel.mp4', '--props=out/props.json'];
-  if (process.env.REMOTION_VERBOSE) renderArgs.push('--log=verbose');
-  await execa('npx', renderArgs, { stdio: 'inherit' });
-  console.log(`✔ rendered out/reel.mp4 (${timings.totalSec.toFixed(1)}s, bg=${bgEntry?.file ?? 'gradient'}, music=${musicFile ?? 'none'})`);
+  if (format === 'cinema') {
+    const beatsFile = JSON.parse(readFileSync('sources/beats.json', 'utf8')) as Record<string, string[]>;
+    const beats = beatsFile[verse.ref] ?? beatsFromTranslation(verse.english);
+    const timings = computeCinemaTimeline(beats);
+    const images = pool.filter((p) => p.kind === 'image');
+    const cinemaPool = images.length ? images : pool;
+    bgEntry = args.background
+      ? resolveBackground(args.background, pool)
+      : cinemaPool.length
+        ? resolveBackground(pickAsset(verse.ref, cinemaPool.map((p) => p.file)), cinemaPool)
+        : null;
+    musicFile = tracks.length ? pickAsset(verse.ref, tracks) : null;
+    const props: ReelProps = {
+      verse,
+      timings: computeTimeline({ introDurSec: 3, meaningDurSec: 10, englishText: verse.english }), // unused by CinemaReel; satisfies the shared ReelProps.timings field
+      format: 'cinema',
+      cinema: { kicker: `GITA ${verse.chapter}.${verse.verse}`, beats, timings },
+      audio: { introFile: null, meaningFile: null },
+      media: { background: bgEntry?.rel ?? null, music: musicFile ? `assets/music/${musicFile}` : null },
+      brand: { handle: config.handle },
+    };
+    mkdirSync('out', { recursive: true });
+    writeFileSync('out/props.json', JSON.stringify(props, null, 2));
+    await renderComposition('CinemaReel');
+    console.log(
+      `✔ rendered out/reel.mp4 (${timings.totalSec.toFixed(1)}s, format=cinema, bg=${bgEntry?.file ?? 'gradient'}, music=${musicFile ?? 'none'}, beats=${beats.length}${beatsFile[verse.ref] ? '' : ' [fallback]'})`,
+    );
+
+    youtubeOverrides = {
+      title: cinemaYoutubeTitle(verse, beats[0]),
+      description: cinemaYoutubeDescription(verse, beats),
+    };
+    instaCaption = cinemaInstagramCaption(verse, beats);
+  } else {
+    // 1. Narration first — the video timeline stretches to fit it.
+    mkdirSync('public/generated', { recursive: true });
+    const intro = await retryOnce('intro TTS', () =>
+      synthHindi(introText(verse), 'public/generated/intro.mp3'),
+    );
+    let meaning = await retryOnce('meaning TTS', () =>
+      synthHindi(verse.hindi, 'public/generated/meaning.mp3'),
+    );
+    let timings: Timings;
+    try {
+      timings = computeTimeline({
+        introDurSec: intro.durationSec,
+        meaningDurSec: meaning.durationSec,
+        englishText: verse.english,
+      });
+    } catch (e) {
+      if (!(e instanceof TimelineTooLongError)) throw e;
+      console.warn(`reel too long (${e.totalSec.toFixed(1)}s); retrying narration 15% faster`);
+      meaning = await retryOnce('faster meaning TTS', () =>
+        synthHindi(verse.hindi, 'public/generated/meaning.mp3', { rate: '+15%' }),
+      );
+      timings = computeTimeline({
+        introDurSec: intro.durationSec,
+        meaningDurSec: meaning.durationSec,
+        englishText: verse.english,
+      });
+    }
+
+    bgEntry = args.background
+      ? resolveBackground(args.background, pool)
+      : pool.length
+        ? resolveBackground(pickAsset(verse.ref, pool.map((p) => p.file)), pool)
+        : null;
+    musicFile = tracks.length ? pickAsset(verse.ref, tracks) : null;
+
+    const props: ReelProps = {
+      verse,
+      timings,
+      audio: { introFile: 'generated/intro.mp3', meaningFile: 'generated/meaning.mp3' },
+      media: {
+        background: bgEntry?.rel ?? null,
+        music: musicFile ? `assets/music/${musicFile}` : null,
+      },
+      brand: { handle: config.handle },
+    };
+    mkdirSync('out', { recursive: true });
+    writeFileSync('out/props.json', JSON.stringify(props, null, 2));
+
+    // 3. Render.
+    await renderComposition('GitaReel');
+    console.log(`✔ rendered out/reel.mp4 (${timings.totalSec.toFixed(1)}s, bg=${bgEntry?.file ?? 'gradient'}, music=${musicFile ?? 'none'})`);
+  }
 
   if (args.dryRun) {
     console.log('dry-run complete — nothing posted, state untouched.');
@@ -161,15 +221,26 @@ async function main(): Promise<void> {
     try {
       const id =
         platform === 'youtube'
-          ? await postYoutube(verse, 'out/reel.mp4', {
-              clientId: requireEnv('YT_CLIENT_ID'),
-              clientSecret: requireEnv('YT_CLIENT_SECRET'),
-              refreshToken: requireEnv('YT_REFRESH_TOKEN'),
-            }, credits)
-          : await postInstagram(verse, videoUrl, {
-              userId: requireEnv('IG_USER_ID'),
-              accessToken: requireEnv('IG_ACCESS_TOKEN'),
-            });
+          ? await postYoutube(
+              verse,
+              'out/reel.mp4',
+              {
+                clientId: requireEnv('YT_CLIENT_ID'),
+                clientSecret: requireEnv('YT_CLIENT_SECRET'),
+                refreshToken: requireEnv('YT_REFRESH_TOKEN'),
+              },
+              credits,
+              youtubeOverrides,
+            )
+          : await postInstagram(
+              verse,
+              videoUrl,
+              {
+                userId: requireEnv('IG_USER_ID'),
+                accessToken: requireEnv('IG_ACCESS_TOKEN'),
+              },
+              instaCaption,
+            );
       current = recordPost(current, verse.ref, platform, id, new Date().toISOString());
       await writeState(STATE_PATH, current);
       console.log(`✔ ${platform}: ${id}`);

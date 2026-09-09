@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { introText, youtubeTitle, youtubeDescription, instagramCaption, HASHTAGS } from './captions.ts';
+import {
+  introText,
+  youtubeTitle,
+  youtubeDescription,
+  instagramCaption,
+  HASHTAGS,
+  cinemaYoutubeTitle,
+  cinemaYoutubeDescription,
+  cinemaInstagramCaption,
+} from './captions.ts';
 import type { Verse } from '../shared/types.ts';
 
 const v: Verse = {
@@ -46,5 +55,27 @@ describe('captions', () => {
   it('hashtag list is fixed and non-empty', () => {
     expect(HASHTAGS.length).toBeGreaterThanOrEqual(8);
     expect(HASHTAGS).toContain('#bhagavadgita');
+  });
+});
+
+describe('cinema captions', () => {
+  const beats = ['Do the work. Release the outcome.', 'You control the effort.'];
+  it('title = hook + reference, <=100 chars, truncated at word boundary', () => {
+    const t = cinemaYoutubeTitle(v, beats[0]);
+    expect(t).toBe('Do the work. Release the outcome. | Bhagavad Gita 2.47 #Shorts');
+    const long = cinemaYoutubeTitle(v, 'word '.repeat(40).trim() + '.');
+    expect(long.length).toBeLessThanOrEqual(100);
+    expect(long).toContain('| Bhagavad Gita 2.47 #Shorts');
+    expect(long).not.toMatch(/\swor\b/);
+  });
+  it('description carries beats, shloka, attribution', () => {
+    const d = cinemaYoutubeDescription(v, beats);
+    for (const s of [beats[0], beats[1], v.sanskrit[0], v.attribution.english]) expect(d).toContain(s);
+  });
+  it('instagram caption is hook-first and under budget', () => {
+    const c = cinemaInstagramCaption(v, beats);
+    expect(c.startsWith(beats[0])).toBe(true);
+    expect(c.length).toBeLessThanOrEqual(2200);
+    expect(c).toContain('#bhagavadgita');
   });
 });

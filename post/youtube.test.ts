@@ -32,4 +32,11 @@ describe('buildYoutubeRequest', () => {
     const r = buildYoutubeRequest(v, ['Music: Kevin MacLeod (incompetech.com), CC BY 3.0']);
     expect(r.snippet.description).toContain('Kevin MacLeod');
   });
+
+  it('override replaces title/description; default stays classic', () => {
+    const r = buildYoutubeRequest(v, [], { title: 'T', description: 'D' });
+    expect(r.snippet.title).toBe('T');
+    expect(r.snippet.description).toBe('D');
+    expect(buildYoutubeRequest(v).snippet.title).toContain('गीता ज्ञान');
+  });
 });
