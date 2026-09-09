@@ -47,7 +47,8 @@ export function validateScheduleFile(input: unknown): ScheduleFile {
     const asset = it.asset as Record<string, unknown> | undefined;
     if (!asset || typeof asset.releaseTag !== 'string' || typeof asset.url !== 'string') bad(`${it.id}: asset.releaseTag/url missing`);
     if (typeof it.thumbnail !== 'string') bad(`${it.id}: thumbnail missing`);
-    const credits = Array.isArray(it.credits) && it.credits.every((c) => typeof c === 'string') ? (it.credits as string[]) : [];
+    if (it.credits !== undefined && (!Array.isArray(it.credits) || !it.credits.every((c) => typeof c === 'string'))) bad(`${it.id}: credits must be an array of strings`);
+    const credits = (it.credits as string[] | undefined) ?? [];
     const posts = it.posts as Record<string, unknown> | undefined;
     if (!posts || typeof posts !== 'object') bad(`${it.id}: posts missing`);
     const out = {} as Record<Platform, PostRecord>;

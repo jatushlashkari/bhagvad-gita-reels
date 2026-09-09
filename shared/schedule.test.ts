@@ -54,6 +54,14 @@ describe('ids and config', () => {
     expect(() => validateScheduleFile('nope')).toThrow(/items/);
     expect(PLATFORMS).toEqual(['instagram', 'facebook', 'youtube']);
   });
+  it('credits: optional on input, but must be an array of strings when present', () => {
+    const good = { items: [item('gita-2-47-20260912-a1b2', '2026-09-12T01:30:00.000Z')] };
+    const bare = { ...good.items[0] } as Partial<ScheduleItem>;
+    delete bare.credits;
+    expect(validateScheduleFile({ items: [bare] }).items[0].credits).toEqual([]);
+    expect(() => validateScheduleFile({ items: [{ ...good.items[0], credits: 'x' }] })).toThrow(/credits/);
+    expect(() => validateScheduleFile({ items: [{ ...good.items[0], credits: [1] }] })).toThrow(/credits/);
+  });
 });
 
 describe('sortItems', () => {
