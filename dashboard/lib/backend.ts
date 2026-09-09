@@ -1,6 +1,7 @@
 import { localBackend } from './local-backend.ts';
 import type { CustomQuote } from '../../shared/custom-quotes.ts';
 import type { ReelStyle } from '../../shared/reel-style.ts';
+import type { Platform, ScheduleConfig, ScheduleItem } from '../../shared/schedule.ts';
 import type { Verse } from '../../shared/types.ts';
 
 export type AssetInfo = { file: string; rel: string; kind: 'clip' | 'image' | 'music'; license: string };
@@ -18,6 +19,19 @@ export type MediaHandle = {
   stream(start?: number, end?: number): ReadableStream<Uint8Array>;
 };
 export type QuoteRow = { ref: string; chapter: number; verse: number; hook: string; beats: string[]; curated: boolean; favorite: boolean; prompt: string; promptCurated: boolean };
+/** Everything the /calendar page needs in one read: the rows, the schedule settings the times are
+ *  displayed in (config.json's `schedule`), which platforms have publishable credentials *on this
+ *  machine* (so "Publish now" can be disabled with an honest reason rather than failing mid-stream)
+ *  and whether this checkout runs in calendar mode at all. */
+export type CalendarView = {
+  items: ScheduleItem[];
+  config: ScheduleConfig;
+  secrets: Record<Platform, boolean>;
+  mode: 'daily' | 'calendar';
+};
+/** The editable slice of a PostRecord. `at: null` means "unscheduled" and is a real value, not an
+ *  omission — hence `string | null` rather than an optional-only field. */
+export type PostPatch = { at?: string | null; caption?: string; title?: string; status?: 'scheduled' | 'skipped' };
 
 export interface Backend {
   repoRoot(): string;
@@ -89,6 +103,30 @@ export interface Backend {
     format?: 'classic' | 'cinema',
     overrides?: { beats?: string[]; style?: unknown; music?: string | null },
   ): ReadableStream<Uint8Array> | 'locked';
+  /** schedule.json (sorted by earliest post time) + config.json's schedule settings and mode +
+   *  a per-platform "are the secrets present here" flag. A malformed schedule.json throws
+   *  readSchedule's own message rather than degrading to an empty calendar — the file is the
+   *  record of what has already been published, so the route answers 500 and says why. */
+  getCalendar(): Promise<CalendarView>;
+  /** Edits one platform's post on one row and returns the whole updated item. Validates the patch
+   *  (at: ISO or null; caption ≤ CAPTION_MAX; title ≤ TITLE_MAX; status 'scheduled' only from
+   *  failed|skipped|scheduled|draft — resetting attempts and clearing error — and 'skipped' only
+   *  from scheduled|draft); a published post takes caption/title edits and nothing else, throwing
+   *  'published posts cannot be edited'. Throws 'no calendar item <id>' for an unknown id, and
+   *  'publisher running' (→ 409) while the render lock is held, since the CLI does its own
+   *  read-modify-write of this same file. */
+  updatePost(id: string, platform: Platform, patch: PostPatch): Promise<ScheduleItem>;
+  /** Drops the row and its public/thumbs/<id>.jpg. Throws '<id> has published posts' (→ 409) when
+   *  any platform already went out — the calendar is the record of that — 'no calendar item <id>'
+   *  for an unknown id, and 'publisher running' while the render lock is held. */
+  deleteItem(id: string): Promise<void>;
+  /** Spawns `npx tsx pipeline/publisher.ts <args>` — the same CLI the hourly workflow runs — and
+   *  streams its combined output ending in `EXIT <code>`, or 'locked' when a render/publish is
+   *  already in flight. Only the row-scoped subcommands are accepted (`--add … --date …`,
+   *  `--rerender <id>`, `--publish-item <id> --platform <p>`); values are the caller's to
+   *  validate. An `EXIT 0` means the publisher ran, not that a post went out — the log's
+   *  `✔ / ✖ / ↷ skipped` lines carry the per-post outcome, so callers re-read the calendar. */
+  calendarCommand(args: string[]): ReadableStream<Uint8Array> | 'locked';
 }
 
 // Thrown by saveImage/saveAudio when the uploaded bytes are invalid (image doesn't decode / audio

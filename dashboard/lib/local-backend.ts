@@ -21,11 +21,23 @@ import { CUSTOM_REF_PREFIX, REF_PATTERN, validateCustomQuote, type CustomQuote }
 import { isAllowedMediaPath } from '../../shared/media-path.ts';
 import { promptFor } from '../../shared/prompts.ts';
 import { validateStyle, type ReelStyle } from '../../shared/reel-style.ts';
+import {
+  CAPTION_MAX,
+  PLATFORMS,
+  TITLE_MAX,
+  sortItems,
+  validateScheduleConfig,
+  type Platform,
+  type PostRecord,
+  type PostStatus,
+  type ScheduleItem,
+} from '../../shared/schedule.ts';
 import { pickNext, readState, verseOrder, type PlatformKey } from '../../pipeline/select.ts';
 import { loadStylePreset } from '../../pipeline/run.ts';
+import { loadDotenv, readSchedule, secretsFor, writeSchedule } from '../../pipeline/schedule-io.ts';
 import type { Manifest } from '../../scripts/fetch-assets.ts';
 import type { Verse } from '../../shared/types.ts';
-import type { AssetInfo, Backend, MediaHandle, QuoteRow, StateSummary } from './backend.ts';
+import type { AssetInfo, Backend, CalendarView, MediaHandle, PostPatch, QuoteRow, StateSummary } from './backend.ts';
 
 export const REPO_ROOT = resolve(process.cwd(), '..');
 
@@ -413,46 +425,40 @@ function gitOutput(e: unknown): string {
   return [err.stdout, err.stderr].filter(Boolean).join('\n');
 }
 
+// Every file the dashboard is allowed to author, and the only thing sync() ever stages or commits.
+// One constant rather than two literal lists, so `git add` and the pathspec-scoped `git commit`
+// below can never drift apart — a path staged but not in the commit's pathspec would silently stay
+// in the index. `public/thumbs` and `schedule.json` join it with the calendar: a row is only usable
+// from the cloud once its thumbnail and its entry are both pushed. (public/thumbs is tracked via a
+// committed .gitkeep, so this pathspec matches even on a checkout that has never rendered a row —
+// a pathspec matching nothing is a fatal `git add`, which would take the whole sync down.)
+const SYNC_PATHS = [
+  'public/assets/images',
+  'public/assets/manifest.json',
+  'styles',
+  'sources/beats.json',
+  'sources/quotes-meta.json',
+  'sources/custom-quotes.json',
+  'schedule.json',
+  'public/thumbs',
+];
+
 async function sync(): Promise<{ ok: boolean; output: string }> {
   const log: string[] = [];
   try {
-    const add = await execa(
-      'git',
-      [
-        'add',
-        'public/assets/images',
-        'public/assets/manifest.json',
-        'styles',
-        'sources/beats.json',
-        'sources/quotes-meta.json',
-        'sources/custom-quotes.json',
-      ],
-      { cwd: REPO_ROOT },
-    );
+    const add = await execa('git', ['add', ...SYNC_PATHS], { cwd: REPO_ROOT });
     log.push(add.stdout, add.stderr);
     try {
       // Pathspec-scoped commit, not a bare `git commit`: a bare commit picks up *anything* the
       // caller happened to have staged (their own in-flight work in another file, say), and
       // pushes it under this message with no way to tell after the fact. Restricting the commit
-      // itself to this same explicit pathspec — the dashboard-owned files (background images +
-      // manifest, the saved style, curated beats, quote favorites and custom quotes) — on top of
+      // itself to this same explicit pathspec — SYNC_PATHS, the dashboard-owned files — on top of
       // the `git add` above already being scoped the same way — means whatever else is sitting in
       // the index is left exactly as it was, staged and uncommitted, no matter what triggered this
       // sync.
       const commit = await execa(
         'git',
-        [
-          'commit',
-          '-m',
-          'chore: sync dashboard edits (backgrounds, style, beats, quotes)',
-          '--',
-          'public/assets/images',
-          'public/assets/manifest.json',
-          'styles',
-          'sources/beats.json',
-          'sources/quotes-meta.json',
-          'sources/custom-quotes.json',
-        ],
+        ['commit', '-m', 'chore: sync dashboard edits (backgrounds, style, beats, quotes, calendar)', '--', ...SYNC_PATHS],
         { cwd: REPO_ROOT },
       );
       log.push(commit.stdout, commit.stderr);
@@ -461,8 +467,7 @@ async function sync(): Promise<{ ok: boolean; output: string }> {
       // git phrases "nothing is staged" three different ways depending on what else is in the
       // tree: "nothing to commit, working tree clean" (pristine), "no changes added to commit"
       // (unstaged edits elsewhere), "nothing added to commit but untracked files present". This
-      // dashboard only ever stages the six paths above (public/assets/images, manifest.json,
-      // styles, and the three sources/*.json files), so all three mean the same no-op — matching
+      // dashboard only ever stages SYNC_PATHS, so all three mean the same no-op — matching
       // only the first made a routine Sync report a red failure to anyone who happened to have an
       // unrelated edit in flight, which is the normal state while working. Verified this still
       // holds now that commit (not just add) is pathspec-scoped: with unrelated changes staged,
@@ -559,17 +564,37 @@ function openMedia(rel: string): MediaHandle | null {
 }
 
 const LOCK = () => join(REPO_ROOT, 'out/.render-lock');
+const LOCK_STALE_MS = 15 * 60 * 1000;
+
+/** True while a child spawned here (a render or a publisher run) is still working. A lock older
+ *  than LOCK_STALE_MS is a crashed run's leftover and reads as idle, same as an absent or corrupt
+ *  one — the single staleness rule every caller sees. */
+function lockHeld(): boolean {
+  try {
+    const { startedAt } = JSON.parse(readFileSync(LOCK(), 'utf8'));
+    return Date.now() - startedAt < LOCK_STALE_MS;
+  } catch {
+    return false; // absent or corrupt → claimable
+  }
+}
 
 function acquireLock(): boolean {
   mkdirSync(join(REPO_ROOT, 'out'), { recursive: true });
-  try {
-    const { startedAt } = JSON.parse(readFileSync(LOCK(), 'utf8'));
-    if (Date.now() - startedAt < 15 * 60 * 1000) return false; // fresh lock → busy
-  } catch { /* absent or corrupt → claimable */ }
+  if (lockHeld()) return false; // fresh lock → busy
   writeFileSync(LOCK(), JSON.stringify({ pid: process.pid, startedAt: Date.now() }));
   return true;
 }
 const releaseLock = () => { try { unlinkSync(LOCK()); } catch { /* already gone */ } };
+
+/** This lock is the ONLY mutual exclusion between the schedule.json writes below (serialized by
+ *  `queue`, which only covers this process) and pipeline/publisher.ts's own read-modify-write of
+ *  the same file in a spawned child: the CLI reads the calendar, renders or posts for minutes,
+ *  then re-reads and writes. An edit that landed inside that window would be picked up by the
+ *  CLI's re-read and written back under the row it rebuilt — or silently dropped — so calendar
+ *  edits are refused while a run is in flight rather than merged and hoped for. */
+function assertPublisherIdle(): void {
+  if (lockHeld()) throw new Error('publisher running');
+}
 
 // Basename only, matching the `--background <file>` contract (pipeline/run.ts resolves it
 // against the asset pool by exact file name): alnum/dot/underscore/hyphen, 1-200 chars, and never
@@ -618,7 +643,7 @@ function generateStream(
   // Written only after the lock is ours: only one render is ever in flight, so there is never a
   // second writer racing this file out from under the render that is about to read it.
   if (overrides !== undefined) writeFileSync(OVERRIDES_PATH(), JSON.stringify(overrides, null, 2) + '\n');
-  const args = [
+  return spawnStream([
     'tsx',
     'pipeline/run.ts',
     '--verse',
@@ -627,12 +652,22 @@ function generateStream(
     ...(background ? ['--background', background] : []),
     ...(format ? ['--format', format] : []),
     ...(overrides !== undefined ? ['--overrides', 'out/studio-overrides.json'] : []),
-  ];
+  ]);
+}
+
+/** Runs `npx <args>` in the repo root and streams its combined stdout/stderr live, ending in
+ *  `EXIT <code>`. The CALLER must already hold the render lock (see acquireLock, and the
+ *  overrides-file ordering in generateStream that is why acquisition can't move in here); this
+ *  function owns *releasing* it, exactly once. Shared by generateStream and calendarCommand so the
+ *  process-group, cancel and release rules below exist in exactly one place. */
+function spawnStream(args: string[]): ReadableStream<Uint8Array> {
   const proc = spawn('npx', args, {
     cwd: REPO_ROOT,
+    // ~/.local/bin is where pipx puts edge-tts, and it is not on the PATH a dev server started
+    // from a GUI/launcher inherits — without this, a classic render dies at the narration step.
     env: { ...process.env, PATH: `${process.env.PATH}:${join(homedir(), '.local/bin')}` },
     // `detached` makes `proc` the leader of its own process group instead of joining ours, so
-    // cancel() below can signal the *whole* group (npx -> tsx -> pipeline/run.ts -> the execa'd
+    // cancel() below can signal the *whole* group (npx -> tsx -> the pipeline -> the execa'd
     // `npx remotion render` -> the remotion CLI -> its native compositor helper) with one call.
     // Without this, killing only `proc` leaves that entire render tree running as orphans that
     // keep the stdout/stderr pipes open — which means 'close' never fires, the lock never
@@ -659,7 +694,7 @@ function generateStream(
     releaseLock();
   };
 
-  return new ReadableStream({
+  return new ReadableStream<Uint8Array>({
     start(c) {
       // Belt-and-braces: every write path checks `canceled` AND is try/catch-guarded, so even an
       // unanticipated ordering (e.g. a straggling 'data' event racing the teardown) can't throw
@@ -718,6 +753,176 @@ function generateStream(
   });
 }
 
+const SCHEDULE_PATH = () => join(REPO_ROOT, 'schedule.json');
+const thumbPath = (id: string) => join(REPO_ROOT, 'public/thumbs', `${id}.jpg`);
+
+// Only the two fields the calendar view needs; config.json carries the daily pipeline's settings
+// too, and re-declaring those here would just be a second copy to keep in step.
+type CalendarConfig = { mode?: string; schedule?: unknown };
+
+async function getCalendar(): Promise<CalendarView> {
+  const [file, config] = await Promise.all([
+    // Deliberately NOT readJson-with-a-fallback: readSchedule throws on a malformed calendar
+    // (the route answers 500 with that message) because this file is the record of what has
+    // already been published — degrading to "nothing scheduled" would invite a re-post.
+    readSchedule(SCHEDULE_PATH()),
+    readJson<CalendarConfig>(join(REPO_ROOT, 'config.json'), {}),
+  ]);
+  // A COPY of process.env, never process.env itself: loadDotenv fills in whatever object it is
+  // handed, and the dashboard must not end up holding publishing credentials in its own
+  // environment for the life of the process (every child it later spawns would inherit them —
+  // and the publisher child loads .env for itself anyway). Real env vars still win over .env,
+  // which is loadDotenv's own rule.
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  loadDotenv(join(REPO_ROOT, '.env'), env);
+  const secrets = {} as Record<Platform, boolean>;
+  // Booleans only — secretsFor's `missing` names are not exposed to the browser, and the flag is
+  // all the UI needs to decide whether "Publish now" can do anything from this machine.
+  for (const p of PLATFORMS) secrets[p] = secretsFor(p, env).ok;
+  return {
+    items: sortItems(file.items),
+    config: validateScheduleConfig(config.schedule),
+    secrets,
+    // Same default as .github/workflows/daily.yml's guard (`config.mode || 'daily'`): anything
+    // that isn't the literal 'calendar' means the daily pipeline still owns posting.
+    mode: config.mode === 'calendar' ? 'calendar' : 'daily',
+  };
+}
+
+// Which stored statuses each editable target may be reached FROM — the calendar's Retry and Skip
+// buttons. 'published' is in neither list on purpose; applyPostPatch rejects it earlier with a
+// message that says why, rather than letting it fail as a generic bad transition.
+const RESCHEDULABLE_FROM: readonly PostStatus[] = ['failed', 'skipped', 'scheduled', 'draft'];
+const SKIPPABLE_FROM: readonly PostStatus[] = ['scheduled', 'draft'];
+
+/** Pure: the stored record + the patch -> the record to write, or a throw whose message the route
+ *  turns into a 400. Split out from the file IO so the whole rule set reads as one list, and so
+ *  the type-level `PostPatch` is re-checked at runtime — the PATCH route hands us parsed JSON,
+ *  which is `unknown` no matter what the signature says. */
+function applyPostPatch(post: PostRecord, patch: PostPatch): PostRecord {
+  // A published post is the record of something that actually went out: its time, status,
+  // attempts and platform id are history and stay put. Only the human-facing text may still be
+  // corrected — fixing a typo in a caption that is already live is worth doing in the calendar
+  // too, and it changes nothing about what happened.
+  if (post.status === 'published' && (patch.at !== undefined || patch.status !== undefined)) {
+    throw new Error('published posts cannot be edited');
+  }
+  const next: PostRecord = { ...post };
+  if (patch.at !== undefined) {
+    if (patch.at === null) next.at = null;
+    else if (typeof patch.at !== 'string' || Number.isNaN(Date.parse(patch.at))) {
+      throw new Error('at must be an ISO instant or null');
+    } else {
+      // Normalized rather than stored verbatim: `at` is read as an instant everywhere downstream
+      // (duePosts compares it, isoToLocal formats it), so the file keeps one canonical spelling
+      // whatever the client sent.
+      next.at = new Date(patch.at).toISOString();
+    }
+  }
+  if (patch.caption !== undefined) {
+    if (typeof patch.caption !== 'string' || patch.caption.length > CAPTION_MAX) {
+      throw new Error(`caption must be a string of at most ${CAPTION_MAX} characters`);
+    }
+    next.caption = patch.caption;
+  }
+  if (patch.title !== undefined) {
+    if (typeof patch.title !== 'string' || patch.title.length > TITLE_MAX) {
+      throw new Error(`title must be a string of at most ${TITLE_MAX} characters`);
+    }
+    next.title = patch.title;
+  }
+  if (patch.status !== undefined) {
+    if (patch.status === 'scheduled') {
+      if (!RESCHEDULABLE_FROM.includes(post.status)) throw new Error(`cannot reschedule a ${post.status} post`);
+      next.status = 'scheduled';
+      // Retry means "start over", so the attempt count goes back to 0 — duePosts only re-picks a
+      // failed post while attempts < MAX_ATTEMPTS — and the old error goes away rather than
+      // sitting next to a scheduled badge where it reads as a live failure.
+      next.attempts = 0;
+      delete next.error;
+    } else if (patch.status === 'skipped') {
+      if (!SKIPPABLE_FROM.includes(post.status)) throw new Error(`cannot skip a ${post.status} post`);
+      next.status = 'skipped';
+    } else {
+      throw new Error("status must be 'scheduled' or 'skipped'");
+    }
+  }
+  return next;
+}
+
+// Routed through the same `queue` as every other shared-file writer: schedule.json is one file for
+// every row and platform, so two overlapping PATCHes (or a PATCH racing a DELETE) would race the
+// same read-modify-write and one edit would vanish. The cross-*process* race — the publisher CLI
+// doing its own read-modify-write — is what assertPublisherIdle covers instead.
+function updatePost(id: string, platform: Platform, patch: PostPatch): Promise<ScheduleItem> {
+  const result = queue.then(() => updatePostExclusive(id, platform, patch));
+  queue = result.then(() => undefined, () => undefined);
+  return result;
+}
+
+async function updatePostExclusive(id: string, platform: Platform, patch: PostPatch): Promise<ScheduleItem> {
+  // Checked inside the queue, not at call time: the answer that matters is whether a run is in
+  // flight at the moment this write is about to happen.
+  assertPublisherIdle();
+  const path = SCHEDULE_PATH();
+  const file = await readSchedule(path);
+  const item = file.items.find((i) => i.id === id);
+  if (!item) throw new Error(`no calendar item ${id}`);
+  item.posts[platform] = applyPostPatch(item.posts[platform], patch);
+  await writeSchedule(path, file);
+  return item;
+}
+
+function deleteItem(id: string): Promise<void> {
+  const result = queue.then(() => deleteItemExclusive(id));
+  queue = result.then(() => undefined, () => undefined);
+  return result;
+}
+
+async function deleteItemExclusive(id: string): Promise<void> {
+  assertPublisherIdle();
+  const path = SCHEDULE_PATH();
+  const file = await readSchedule(path);
+  const item = file.items.find((i) => i.id === id);
+  if (!item) throw new Error(`no calendar item ${id}`);
+  // schedule.json is the only place that records a post actually going out (state.json tracks
+  // refs, not rows), so a row with a published post is never deletable. The UI disables Delete;
+  // this is the backstop that makes that a rule rather than a convention.
+  if (PLATFORMS.some((p) => item.posts[p].status === 'published')) throw new Error(`${id} has published posts`);
+  await writeSchedule(path, { items: file.items.filter((i) => i.id !== id) });
+  // After the write, and best-effort: an orphaned thumbnail is harmless, whereas a thumbnail
+  // deleted for a row that is still in the file leaves a broken image in the table. Built from
+  // the id readSchedule already validated against ITEM_ID, never from the row's own `thumbnail`
+  // string, so a hand-edited path can't aim this unlink somewhere else.
+  await unlink(thumbPath(item.id)).catch(() => {});
+}
+
+const CALENDAR_SUBCOMMANDS = ['--add', '--rerender', '--publish-item'];
+const CALENDAR_FLAGS = new Set([...CALENDAR_SUBCOMMANDS, '--date', '--format', '--from-last-render', '--platform']);
+
+// calendarCommand spawns whatever it is handed, so the flag vocabulary is pinned here even though
+// the routes build these arrays themselves: pipeline/publisher.ts also understands --auto-fill,
+// --publish-due, --now and --days, and slipping one of those in would turn "re-render this row"
+// into a full hourly run that posts everything currently due. Bare argv (no subcommand at all) IS
+// that run, so it is rejected too. Values stay the caller's job — the routes check ref/date/id/
+// platform and parsePublisherArgs checks them again inside the child — and since no valid value
+// can start with '-' (REF_PATTERN, ITEM_ID, YYYY-MM-DD and PLATFORMS all begin alphanumeric),
+// "an unknown token that starts with '-'" is a safe thing to refuse.
+function assertCalendarArgs(args: string[]): void {
+  if (!Array.isArray(args) || !args.every((a) => typeof a === 'string')) throw new Error('invalid calendar command');
+  if (args.some((a) => a.startsWith('-') && !CALENDAR_FLAGS.has(a))) throw new Error('invalid calendar command');
+  if (!args.some((a) => CALENDAR_SUBCOMMANDS.includes(a))) throw new Error('invalid calendar command');
+}
+
+function calendarCommand(args: string[]): ReadableStream<Uint8Array> | 'locked' {
+  assertCalendarArgs(args);
+  // The same lock as generateStream, for the same reason and one more: a publisher run both
+  // renders (one render at a time) and rewrites schedule.json, which is exactly what makes this
+  // lock the single point of mutual exclusion with updatePost/deleteItem above.
+  if (!acquireLock()) return 'locked';
+  return spawnStream(['tsx', 'pipeline/publisher.ts', ...args]);
+}
+
 export const localBackend: Backend = {
   repoRoot,
   listAssets,
@@ -739,4 +944,8 @@ export const localBackend: Backend = {
   sync,
   openMedia,
   generate: generateStream,
+  getCalendar,
+  updatePost,
+  deleteItem,
+  calendarCommand,
 };

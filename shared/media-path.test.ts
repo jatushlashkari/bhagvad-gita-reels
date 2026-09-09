@@ -49,8 +49,17 @@ describe('isAllowedMediaPath', () => {
       'public/assets/backgrounds/',
       'public/assets/images/',
       'public/assets/music/',
+      'public/thumbs/',
       'out/reel.mp4',
     ]);
+  });
+
+  it('allows a thumbnail under public/thumbs', () => {
+    expect(isAllowedMediaPath(['public', 'thumbs', 'gita-2-47-20260920-ab12.jpg'].join('/'))).toBe(true);
+  });
+
+  it('rejects an escape attempt rooted under the thumbs directory', () => {
+    expect(isAllowedMediaPath(['public', 'thumbs', '..', '..', 'secret'].join('/'))).toBe(false);
   });
 
   it('allows an ordinary file under the music directory', () => {
