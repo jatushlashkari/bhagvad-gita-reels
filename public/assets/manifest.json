@@ -81,6 +81,12 @@
       "url": "https://raw.githubusercontent.com/notofonts/notofonts.github.io/main/fonts/NotoSerif/hinted/ttf/NotoSerif-Regular.ttf",
       "license": "OFL-1.1",
       "source": "https://github.com/notofonts/latin-greek-cyrillic"
+    },
+    {
+      "file": "ArchivoBlack-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/archivoblack/ArchivoBlack-Regular.ttf",
+      "license": "OFL-1.1",
+      "source": "https://github.com/Omnibus-Type/ArchivoBlack"
     }
   ],
   "images": [
