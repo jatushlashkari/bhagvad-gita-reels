@@ -196,7 +196,7 @@ export default function QuotesPage() {
                     <p className="mt-1 text-xs text-[#a89f8d]/70">
                       {q.prompt
                         ? `${q.prompt.slice(0, 90)}${q.prompt.length > 90 ? '…' : ''}`
-                        : 'no image prompt — chapter theme fallback'}
+                        : 'no image prompt — generic theme fallback'}
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2">

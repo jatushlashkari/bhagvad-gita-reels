@@ -434,9 +434,11 @@ async function sync(): Promise<{ ok: boolean; output: string }> {
       // Pathspec-scoped commit, not a bare `git commit`: a bare commit picks up *anything* the
       // caller happened to have staged (their own in-flight work in another file, say), and
       // pushes it under this message with no way to tell after the fact. Restricting the commit
-      // itself to these two paths — on top of the `git add` above already being scoped the same
-      // way — means whatever else is sitting in the index is left exactly as it was, staged and
-      // uncommitted, no matter what triggered this sync.
+      // itself to this same explicit pathspec — the dashboard-owned files (background images +
+      // manifest, the saved style, curated beats, quote favorites and custom quotes) — on top of
+      // the `git add` above already being scoped the same way — means whatever else is sitting in
+      // the index is left exactly as it was, staged and uncommitted, no matter what triggered this
+      // sync.
       const commit = await execa(
         'git',
         [
@@ -459,11 +461,12 @@ async function sync(): Promise<{ ok: boolean; output: string }> {
       // git phrases "nothing is staged" three different ways depending on what else is in the
       // tree: "nothing to commit, working tree clean" (pristine), "no changes added to commit"
       // (unstaged edits elsewhere), "nothing added to commit but untracked files present". This
-      // dashboard only ever stages public/assets, so all three mean the same no-op — matching
+      // dashboard only ever stages the six paths above (public/assets/images, manifest.json,
+      // styles, and the three sources/*.json files), so all three mean the same no-op — matching
       // only the first made a routine Sync report a red failure to anyone who happened to have an
       // unrelated edit in flight, which is the normal state while working. Verified this still
       // holds now that commit (not just add) is pathspec-scoped: with unrelated changes staged,
-      // unstaged, or untracked outside public/assets, `git commit -- <paths>` reuses these same
+      // unstaged, or untracked outside those six paths, `git commit -- <paths>` reuses these same
       // three phrasings (never a pathspec-specific message) — see the scratch-repo scenarios in
       // the fix-up report.
       if (!/nothing to commit|no changes added to commit|nothing added to commit/i.test(text)) throw e;

@@ -422,7 +422,7 @@ export default function StudioPage() {
       </header>
 
       <section className={panelClass}>
-        <h2 className={headingClass}>Verse</h2>
+        <h2 className={headingClass}>Source</h2>
         <div className={`mt-3 grid gap-3 ${source.kind === 'verse' ? 'sm:grid-cols-4' : 'sm:grid-cols-2'}`}>
           <Field label="source">
             <select

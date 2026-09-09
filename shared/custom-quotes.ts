@@ -14,7 +14,7 @@ export const PROMPT_MAX = 300;
 export const customRef = (id: string) => `${CUSTOM_REF_PREFIX}${id}`;
 
 export function slugId(firstLine: string, rand: string): string {
-  const base = firstLine.toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').trim().replace(/[\s-]+/g, '-').slice(0, 32).replace(/-+$/, '');
+  const base = firstLine.toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').trim().replace(/[\s-]+/g, '-').slice(0, 32).replace(/^-+|-+$/g, '');
   return `${base || 'quote'}-${rand}`;
 }
 
@@ -41,6 +41,7 @@ export function customQuoteProblem(q: { lines: string[]; attribution: string; ki
   if (q.kicker.trim().length > KICKER_MAX) return `kicker is capped at ${KICKER_MAX} characters`;
   if (NO_EMOJI.test(q.kicker)) return 'kicker: emoji are not allowed on screen';
   if (q.prompt.trim().length > PROMPT_MAX) return `prompt is capped at ${PROMPT_MAX} characters`;
+  if (NO_EMOJI.test(q.prompt)) return 'prompt: emoji are not allowed';
   return null;
 }
 
@@ -63,7 +64,9 @@ export function validateCustomQuote(input: unknown, existingIds: string[], now: 
     if (typeof o.id !== 'string' || !CUSTOM_ID.test(o.id)) throw new Error('id must be a slug: 3-48 chars of a-z, 0-9, -');
     id = o.id;
   } else {
-    id = slugId(lines[0], rand4());
+    const rand = rand4();
+    id = slugId(lines[0], rand);
+    if (!CUSTOM_ID.test(id)) id = `quote-${rand}`;
   }
   if (existingIds.includes(id)) throw new Error(`a custom quote with id "${id}" already exists`);
   const createdAt = typeof o.createdAt === 'string' && !Number.isNaN(Date.parse(o.createdAt)) ? o.createdAt : now.toISOString();

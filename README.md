@@ -94,7 +94,7 @@ Your own text, rendered through the same cinema pipeline as a verse. Create, edi
 `/quotes`'s Custom quotes panel: 2–6 lines (≤90 chars each, no emoji), an optional **attribution**
 (≤60 chars, defaults to `श्रीकृष्ण`) for the closing card, an optional **kicker** (≤30 chars,
 defaults to `श्रीकृष्ण कहते हैं`) for the top line, and an optional **image prompt** (≤300 chars —
-leave it blank to fall back to the chapter theme). Quotes are stored in `sources/custom-quotes.json`;
+leave it blank to fall back to the generic theme). Quotes are stored in `sources/custom-quotes.json`;
 each gets an id — a slug of its first line plus four random characters — used as its ref,
 `custom:<id>`.
 
@@ -139,4 +139,4 @@ Drop a `sources/<book>.json` in the same schema (see `sources/gita.json`) and po
 
 ## Content licensing
 
-Verse text/translations: public-domain dataset (github.com/gita/gita, Unlicense) — Hindi: Swami Ramsukhdas, English: Swami Sivananda, attributed in every caption. Footage/music: CC0 / Public Domain / CC BY only, each recorded with license + source in `public/assets/manifest.json`; CC BY credits are appended to YouTube descriptions automatically. Fonts: Noto Serif (OFL-1.1).
+Verse text/translations: public-domain dataset (github.com/gita/gita, Unlicense) — Hindi: Swami Ramsukhdas, English: Swami Sivananda, attributed in every caption. Footage/music: CC0 / Public Domain / CC BY only, each recorded with license + source in `public/assets/manifest.json`; CC BY credits are appended to YouTube descriptions automatically. Fonts: Noto Serif, Archivo Black, Cinzel, Playfair Display, Montserrat, Bebas Neue (all OFL-1.1, github.com/google/fonts).

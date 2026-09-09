@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { REF_PATTERN, customQuoteProblem, placeholderVerse, slugId, validateCustomQuote } from './custom-quotes.ts';
+import { CUSTOM_ID, REF_PATTERN, customQuoteProblem, placeholderVerse, slugId, validateCustomQuote } from './custom-quotes.ts';
 
 describe('custom quotes', () => {
   it('fills defaults, mints a slug id and stamps createdAt', () => {
@@ -36,10 +36,21 @@ describe('custom quotes', () => {
     expect(slugId('कर्म करो', 'ab12')).toBe('quote-ab12');
     expect(slugId('Do the work. Release the outcome. Stay steady.', 'zz99')).toBe('do-the-work-release-the-outcome-zz99');
   });
+  it('slugId strips leading dashes too, not just trailing ones', () => {
+    expect(slugId('- Do the work.', 'ab12')).toBe('do-the-work-ab12');
+  });
+  it('slugId always mints an id matching CUSTOM_ID, whatever the first line looks like', () => {
+    for (const line of ['- Do the work.', '---', 'कर्म करो', '!!!', 'a'.repeat(100), '  -  ', '-a']) {
+      expect(CUSTOM_ID.test(slugId(line, 'ab12'))).toBe(true);
+    }
+  });
   it('customQuoteProblem mirrors the rules without throwing', () => {
     expect(customQuoteProblem({ lines: ['a.', 'b.'], attribution: 'x', kicker: 'k', prompt: '' })).toBeNull();
     expect(customQuoteProblem({ lines: ['a.'], attribution: 'x', kicker: 'k', prompt: '' })).toMatch(/2/);
     expect(customQuoteProblem({ lines: ['a.', 'b.'], attribution: 'x'.repeat(61), kicker: 'k', prompt: '' })).toMatch(/60/);
+  });
+  it('customQuoteProblem catches emoji in the prompt, matching checkText server-side', () => {
+    expect(customQuoteProblem({ lines: ['a.', 'b.'], attribution: 'x', kicker: 'k', prompt: 'x 🙏' })).not.toBeNull();
   });
   it('placeholderVerse shape and REF_PATTERN', () => {
     const v = placeholderVerse(validateCustomQuote({ id: 'abc-123', lines: ['a.', 'b.'], attribution: 'Meera' }, []));

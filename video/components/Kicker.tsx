@@ -11,12 +11,16 @@ export const Kicker: React.FC<{ text: string; inSec: number; handle: string; sty
     extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic),
   });
   if (!style.showKicker && !style.showHandle) return null;
+  // letterSpacing: 14 was tuned for the Latin kicker (e.g. "GITA 2.47"); a Devanagari kicker's
+  // conjuncts render visibly spread apart at that tracking, so Devanagari text gets a much
+  // tighter value instead. The handle line (romanised, e.g. "@yourhandle") is unaffected.
+  const isDevanagari = /[ऀ-ॿ]/.test(text);
   return (
     <>
       {style.showKicker && (
         <div style={{
           position: 'absolute', top: 150, width: '100%', textAlign: 'center', opacity,
-          fontFamily: kickerFamilyFor(style.kickerFont), fontSize: 34, letterSpacing: 14, color: style.accentColor,
+          fontFamily: kickerFamilyFor(style.kickerFont), fontSize: 34, letterSpacing: isDevanagari ? 4 : 14, color: style.accentColor,
           textShadow: '0 2px 18px rgba(0,0,0,0.85)',
         }}>
           {text}

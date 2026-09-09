@@ -144,7 +144,7 @@ export function CustomQuoteForm({
             className={selectClass}
             maxLength={PROMPT_MAX}
             rows={3}
-            placeholder="leave blank to use the chapter theme fallback"
+            placeholder="leave blank to use the generic theme fallback"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />

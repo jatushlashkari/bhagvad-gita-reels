@@ -1,5 +1,5 @@
 'use client';
-import type { ReelStyle } from '../../../../shared/reel-style.ts';
+import { PROMPT_PREFIX_MAX, type ReelStyle } from '../../../../shared/reel-style.ts';
 import { BEAT_FONTS, FONT_LABELS, KICKER_FONTS } from '../../../../shared/font-map.ts';
 import { Field, Slider, Toggle, buttonClass, headingClass, panelClass, selectClass } from './ui.tsx';
 
@@ -105,7 +105,7 @@ export function StyleControls({
             <input
               aria-label="prompt prefix"
               className={selectClass}
-              maxLength={200}
+              maxLength={PROMPT_PREFIX_MAX}
               value={style.promptPrefix}
               onChange={(e) => onChange({ promptPrefix: e.target.value })}
             />
