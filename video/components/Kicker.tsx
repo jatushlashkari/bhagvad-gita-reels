@@ -1,7 +1,7 @@
 import { Easing, interpolate, useCurrentFrame } from 'remotion';
 import { FPS } from '../../shared/types.ts';
 import type { ReelStyle } from '../../shared/reel-style.ts';
-import { LATIN } from '../fonts.ts';
+import { kickerFamilyFor } from '../../shared/font-map.ts';
 
 export const Kicker: React.FC<{ text: string; inSec: number; handle: string; style: ReelStyle }> = ({
   text, inSec, handle, style,
@@ -16,7 +16,7 @@ export const Kicker: React.FC<{ text: string; inSec: number; handle: string; sty
       {style.showKicker && (
         <div style={{
           position: 'absolute', top: 150, width: '100%', textAlign: 'center', opacity,
-          fontFamily: LATIN, fontSize: 34, letterSpacing: 14, color: style.accentColor,
+          fontFamily: kickerFamilyFor(style.kickerFont), fontSize: 34, letterSpacing: 14, color: style.accentColor,
           textShadow: '0 2px 18px rgba(0,0,0,0.85)',
         }}>
           {text}
@@ -25,7 +25,7 @@ export const Kicker: React.FC<{ text: string; inSec: number; handle: string; sty
       {style.showHandle && (
         <div style={{
           position: 'absolute', top: 70, width: '100%', textAlign: 'center', opacity: opacity * 0.75,
-          fontFamily: LATIN, fontSize: 22, letterSpacing: 6, color: '#f5efe0',
+          fontFamily: kickerFamilyFor(style.kickerFont), fontSize: 22, letterSpacing: 6, color: '#f5efe0',
           textShadow: '0 2px 14px rgba(0,0,0,0.85)',
         }}>
           {handle}

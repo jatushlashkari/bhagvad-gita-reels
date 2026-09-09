@@ -1,5 +1,6 @@
 'use client';
 import type { ReelStyle } from '../../../../shared/reel-style.ts';
+import { BEAT_FONTS, FONT_LABELS, KICKER_FONTS } from '../../../../shared/font-map.ts';
 import { Field, Slider, Toggle, buttonClass, headingClass, panelClass, selectClass } from './ui.tsx';
 
 const colorClass = 'h-9 w-full cursor-pointer rounded-lg border border-white/10 bg-[#0d0817] p-1';
@@ -33,8 +34,22 @@ export function StyleControls({
             value={style.beatFont}
             onChange={(e) => onChange({ beatFont: e.target.value as ReelStyle['beatFont'] })}
           >
-            <option value="display">Display (Archivo Black)</option>
-            <option value="serif">Serif (Noto Serif)</option>
+            {BEAT_FONTS.map((f) => (
+              <option key={f} value={f}>{FONT_LABELS[f]}</option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="kicker font">
+          <select
+            aria-label="kicker font"
+            className={selectClass}
+            value={style.kickerFont}
+            onChange={(e) => onChange({ kickerFont: e.target.value as ReelStyle['kickerFont'] })}
+          >
+            {KICKER_FONTS.map((f) => (
+              <option key={f} value={f}>{FONT_LABELS[f]}</option>
+            ))}
           </select>
         </Field>
 

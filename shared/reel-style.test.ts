@@ -29,4 +29,12 @@ describe('validateStyle', () => {
   it('never throws', () => {
     for (const bad of [undefined, 42, [], { musicFile: {} }]) expect(() => validateStyle(bad)).not.toThrow();
   });
+  it('accepts the new beat fonts and defaults/validates kickerFont', () => {
+    expect(validateStyle({ beatFont: 'cinzel' }).beatFont).toBe('cinzel');
+    expect(validateStyle({ beatFont: 'bebas' }).beatFont).toBe('bebas');
+    expect(validateStyle({ beatFont: 'comic' }).beatFont).toBe('display');
+    expect(validateStyle({}).kickerFont).toBe('serif');
+    expect(validateStyle({ kickerFont: 'cinzel' }).kickerFont).toBe('cinzel');
+    expect(validateStyle({ kickerFont: 'bebas' }).kickerFont).toBe('serif');
+  });
 });

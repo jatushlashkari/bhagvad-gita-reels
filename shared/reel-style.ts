@@ -1,5 +1,8 @@
+import { BEAT_FONTS, KICKER_FONTS, type BeatFont, type KickerFont } from './font-map.ts';
+
 export type ReelStyle = {
-  beatFont: 'display' | 'serif';
+  beatFont: BeatFont;
+  kickerFont: KickerFont;
   beatSizePx: number;
   textColor: string;
   accentColor: string;
@@ -14,7 +17,7 @@ export type ReelStyle = {
 };
 
 export const DEFAULT_STYLE: ReelStyle = {
-  beatFont: 'display', beatSizePx: 64, textColor: '#ffffff', accentColor: '#e8c874',
+  beatFont: 'display', kickerFont: 'serif', beatSizePx: 64, textColor: '#ffffff', accentColor: '#e8c874',
   scrimStrength: 0.45, durationScale: 1, crossfadeSec: 0.35, kenBurns: 'gentle',
   showKicker: true, showHandle: true, musicMode: 'silent', musicFile: null,
 };
@@ -31,7 +34,8 @@ const bool = (v: unknown, d: boolean) => (typeof v === 'boolean' ? v : d);
 export function validateStyle(s: unknown): ReelStyle {
   const o = (s && typeof s === 'object' && !Array.isArray(s) ? s : {}) as Record<string, unknown>;
   return {
-    beatFont: oneOf(o.beatFont, ['display', 'serif'] as const, DEFAULT_STYLE.beatFont),
+    beatFont: oneOf(o.beatFont, BEAT_FONTS, DEFAULT_STYLE.beatFont),
+    kickerFont: oneOf(o.kickerFont, KICKER_FONTS, DEFAULT_STYLE.kickerFont),
     beatSizePx: num(o.beatSizePx, DEFAULT_STYLE.beatSizePx, 40, 96),
     textColor: color(o.textColor, DEFAULT_STYLE.textColor),
     accentColor: color(o.accentColor, DEFAULT_STYLE.accentColor),

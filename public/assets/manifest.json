@@ -87,6 +87,30 @@
       "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/archivoblack/ArchivoBlack-Regular.ttf",
       "license": "OFL-1.1",
       "source": "https://github.com/Omnibus-Type/ArchivoBlack"
+    },
+    {
+      "file": "Cinzel-Variable.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/cinzel/Cinzel%5Bwght%5D.ttf",
+      "license": "OFL-1.1",
+      "source": "https://github.com/google/fonts/tree/main/ofl/cinzel"
+    },
+    {
+      "file": "PlayfairDisplay-Variable.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf",
+      "license": "OFL-1.1",
+      "source": "https://github.com/google/fonts/tree/main/ofl/playfairdisplay"
+    },
+    {
+      "file": "Montserrat-Variable.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/montserrat/Montserrat%5Bwght%5D.ttf",
+      "license": "OFL-1.1",
+      "source": "https://github.com/google/fonts/tree/main/ofl/montserrat"
+    },
+    {
+      "file": "BebasNeue-Regular.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/bebasneue/BebasNeue-Regular.ttf",
+      "license": "OFL-1.1",
+      "source": "https://github.com/google/fonts/tree/main/ofl/bebasneue"
     }
   ],
   "images": [
