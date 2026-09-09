@@ -46,6 +46,12 @@ describe('beatsFromTranslation', () => {
       expect(/[.!?…,]$/.test(line)).toBe(true);
     }
   });
+
+  it('midpoint-split continuation keeps its original casing (reads as one thought)', () => {
+    const b = beatsFromTranslation('He who sees inaction in action truly sees');
+    expect(b).toHaveLength(2);
+    expect(b[1][0]).toBe(b[1][0].toLowerCase());
+  });
 });
 
 describe('validateBeatsFile', () => {

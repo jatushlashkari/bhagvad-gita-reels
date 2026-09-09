@@ -8,6 +8,7 @@ export function beatDurationSec(text: string): number {
 
 const VOCATIVE = /^O [^,]{2,30},\s*/;
 
+// skipCapitalize: when true, preserves original casing for continuation beats (second half of midpoint splits) to maintain visual continuity as one thought across cards
 function polish(line: string, skipCapitalize: boolean = false): string {
   let s = line.trim().replace(VOCATIVE, '').trim();
   if (!s) return s;
