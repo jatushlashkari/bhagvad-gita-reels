@@ -696,7 +696,7 @@ describe('validateConfigPatch', () => {
     expect(errs(validateConfigPatch({ schedule: 'now' })).schedule).toMatch(/object/);
   });
 
-  it('collects every field's error in one pass', () => {
+  it('collects errors from every field in one pass', () => {
     const e = errs(validateConfigPatch({ handle: 'x', format: 'nope' }));
     expect(Object.keys(e).sort()).toEqual(['format', 'handle']);
   });
