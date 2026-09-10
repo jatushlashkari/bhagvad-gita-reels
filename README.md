@@ -153,11 +153,12 @@ its own scheduled time, status and caption (YouTube also gets its own title).
   that isn't already in `schedule.json` or in `state.json`'s posted history — the same order daily
   mode walks. Custom quotes are never auto-picked; they only reach the calendar by hand, from
   Studio's "Add to calendar" or the CLI's `--add`.
-- **Retries and `skipped`** — a `failed` post is retried automatically by the hourly publisher, up
-  to 3 attempts total, before it's left alone. `skipped` (no local or cloud secrets for that
-  platform yet, or a `SCHEDULE_SKIP_RELEASE` row with nothing to publish) is never retried
-  automatically — it sits until an operator presses Retry here, or runs `--publish-item` from the
-  CLI.
+- **Retries and `skipped`** — a `failed` post — the platform call itself errored, or a
+  `SCHEDULE_SKIP_RELEASE` row fails with "no asset url" once secrets exist, since it was never
+  given anything to publish — is retried automatically by the hourly publisher, up to 3 attempts
+  total, before it's left alone. `skipped` (no local or cloud secrets for that platform yet) is
+  never retried automatically — it sits until an operator presses Retry here, or runs
+  `--publish-item` from the CLI.
 - **Sync** (see above) now also commits and pushes `schedule.json` and `public/thumbs/`, so a
   calendar edited here reaches the cloud publisher too.
 

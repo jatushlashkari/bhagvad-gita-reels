@@ -121,8 +121,10 @@ it works") — there is nothing to dispatch on it here.
    `schedule.json`) should show `config.schedule.daysAhead` rows, each with a thumbnail and
    prefilled captions, every post still `scheduled` — none `published`.
 5. Let it run from here — do nothing. `publisher.yml`'s cron checks every hour; as each post's own
-   scheduled time arrives, that hour's run flips it to `published` (or `failed`, naming which
-   secret was wrong, in the run's log).
+   scheduled time arrives, that hour's run publishes it, marks it `failed` with whatever the
+   platform's own API returned (a bad or expired credential shows up as that platform's error, not
+   as a secret name), or — when a secret is absent entirely rather than merely wrong — marks it
+   `skipped` with `missing secrets: ...` in the log.
 6. Verify the first row across all three platforms: YouTube Studio shows the Short (public, or
    private if pre-audit — see §4 above), the reel is live on Instagram and on the Facebook Page,
    a release for that row's ref exists with the MP4, and `state.json` records the platform IDs.
