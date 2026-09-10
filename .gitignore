@@ -5,3 +5,4 @@ public/assets/backgrounds/
 public/assets/music/
 .env
 *.log
+.playwright-mcp/

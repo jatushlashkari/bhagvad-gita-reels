@@ -1,6 +1,6 @@
 # One-time Setup Guide
 
-Work through these steps once (~1 hour). At the end, the system posts a reel every morning at 7:00 AM IST with zero involvement from you.
+Work through these steps once (~1 hour). At the end, an hourly publisher posts reels — Instagram, Facebook and YouTube — around 7:00 AM IST every day, with zero involvement from you.
 
 Each step ends with the **repo secret(s)** it produces. Add secrets with:
 `gh secret set NAME --body "value"` — or on github.com → your repo → Settings → Secrets and variables → Actions → New repository secret.
@@ -102,23 +102,44 @@ npm run generate -- --verse gita:2:47 --dry-run  # renders out/reel.mp4, posts n
 open out/reel.mp4
 ```
 
-## 7. Supervised first run
+## 7. Go-live: supervised first run (calendar mode)
+
+`config.json`'s `"mode": "calendar"` is the default, so this is what "go live" means day to day:
+`publisher.yml` runs every hour, keeps `config.schedule.daysAhead` days of reels rendered and ready,
+and posts each one — Instagram, Facebook, YouTube — at its own scheduled time. `daily-reel` stays
+**idle** the whole time (it only runs when `config.json`'s `mode` is `"daily"` — see README's "How
+it works") — there is nothing to dispatch on it here.
 
 1. Push everything; check the **ci** workflow is green in the Actions tab.
-2. Actions tab → **daily-reel** → *Run workflow* → set verse `gita:1:1` → Run.
-3. Verify:
-   - YouTube Studio shows the Short (public, or private if pre-audit — see step 4),
-   - the reel is live on Instagram,
-   - a release `reel-gita-1-1` exists with the MP4,
-   - `state.json` on main now records both platform IDs.
-4. Do nothing tomorrow — at 7:00 AM IST the schedule posts `gita:1:2` by itself.
+2. Add every secret §§3-4 produced: `IG_USER_ID`, `IG_ACCESS_TOKEN`, `FB_PAGE_ID`,
+   `FB_PAGE_ACCESS_TOKEN`, `YT_CLIENT_ID`, `YT_CLIENT_SECRET`, `YT_REFRESH_TOKEN` — seven in total.
+   (`publisher.yml`'s `GH_TOKEN` needs no secret of its own; the workflow gets it for free as
+   `github.token`.)
+3. Enable the workflow — it ships disabled like `daily-reel`: `gh workflow enable publisher`.
+4. Dispatch a dry run first, to watch rows appear without posting anything: Actions tab →
+   **publisher** → *Run workflow* → check `dry_run` → Run. When it finishes, `/calendar` (or
+   `schedule.json`) should show `config.schedule.daysAhead` rows, each with a thumbnail and
+   prefilled captions, every post still `scheduled` — none `published`.
+5. Let it run from here — do nothing. `publisher.yml`'s cron checks every hour; as each post's own
+   scheduled time arrives, that hour's run flips it to `published` (or `failed`, naming which
+   secret was wrong, in the run's log).
+6. Verify the first row across all three platforms: YouTube Studio shows the Short (public, or
+   private if pre-audit — see §4 above), the reel is live on Instagram and on the Facebook Page,
+   a release for that row's ref exists with the MP4, and `state.json` records the platform IDs.
 
-**Success gate:** 7 consecutive automatic days on both platforms.
+**Success gate:** 7 consecutive days, all three platforms, with no manual intervention beyond what
+"When something fails" below describes.
+
+A post can come back `skipped` rather than `failed` — most often a run that landed before every
+secret above was in place. `skipped` posts are **never retried automatically** (the hourly publisher
+only auto-retries `failed` posts, up to 3 attempts) — once the missing secret is fixed, press
+**Retry** on `/calendar` for that post, or run
+`npx tsx pipeline/publisher.ts --publish-item <id> --platform <platform>` from the CLI.
 
 ## When something fails
 
 - GitHub emails you when a run fails. Open the run → download the **reel** artifact → post manually that day if you want.
-- Re-running a failed run is always safe: `state.json` guarantees nothing double-posts; only the missing platform is retried.
+- Re-running is always safe: in daily mode `state.json` guarantees nothing double-posts and only the missing platform is retried; in calendar mode each post's own status in `schedule.json` is that guard — a `failed` post is retried automatically (up to 3 attempts), a `skipped` one only on a manual Retry (see §7), and a `published` one never again.
 - Instagram token refresh failing? Re-do step 3.5 to mint a fresh token, update the `IG_ACCESS_TOKEN` secret.
 
 Prefer a browser over the CLI for step 6? `npm run dashboard` gives you upload/generate/sync from http://localhost:4000 — see README's **Dashboard** section. Want to design the cinema look before flipping `config.json` to it? `/studio` on that same dashboard — see README's **Studio** subsection.
