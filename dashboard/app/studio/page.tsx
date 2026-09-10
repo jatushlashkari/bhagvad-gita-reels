@@ -18,14 +18,14 @@ import { PageHeader } from '../components/shell/PageHeader.tsx';
 import { BeatsEditor, beatsProblem } from '../components/studio/BeatsEditor.tsx';
 import { MediaControls, ROTATION_NOTE, type Asset } from '../components/studio/MediaControls.tsx';
 import { StyleControls } from '../components/studio/StyleControls.tsx';
-import { Field, buttonClass, headingClass, panelClass, selectClass } from '../components/studio/ui.tsx';
+import { Field, buttonClass, headingClass, panelClass, selectClass } from '../components/ui.tsx';
 
 // `video/fonts.ts` calls loadFont() (→ `new FontFace(...)`) at module scope, and a client
 // component's module graph still executes during SSR — so the whole Remotion subtree, Player
 // included, is loaded browser-only.
 const PreviewPane = dynamic(() => import('../components/studio/PreviewPane.tsx').then((m) => m.PreviewPane), {
   ssr: false,
-  loading: () => <div className="aspect-[9/16] w-full animate-pulse rounded-xl bg-[#161028]" />,
+  loading: () => <div className="aspect-[9/16] w-full animate-pulse rounded-xl bg-surface" />,
 });
 
 const REEL_URL = '/api/media/out/reel.mp4';
@@ -56,11 +56,11 @@ function ReelPlayer() {
   const [src] = useState(() => `${REEL_URL}?t=${Date.now()}`);
   return (
     <div className="mt-4 flex flex-wrap items-end gap-4">
-      <video controls src={src} className="aspect-[9/16] w-48 rounded-xl ring-1 ring-white/10" />
+      <video controls src={src} className="aspect-[9/16] w-48 rounded-xl ring-1 ring-line" />
       <a
         href={src}
         download="reel.mp4"
-        className="rounded-lg border border-[#e8c874]/40 px-3 py-1.5 text-sm text-[#e8c874] transition-colors hover:bg-[#e8c874]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e8c874]/60"
+        className="rounded-lg border border-accent/50 px-3 py-1.5 text-sm text-accent-text transition-colors hover:bg-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
       >
         Download
       </a>
@@ -490,25 +490,25 @@ export default function StudioPage() {
                   </select>
                 </Field>
                 <div className="self-end text-sm">
-                  <span className="mr-2 text-[#e8c874] tabular-nums">गीता {source.ch}.{source.vs}</span>
-                  <span className={verse ? 'text-[#a89f8d]' : 'text-[#a89f8d]/40'}>{verse ? verse.hindi : '—'}</span>
+                  <span className="mr-2 text-accent-text tabular-nums">गीता {source.ch}.{source.vs}</span>
+                  <span className={verse ? 'text-muted' : 'text-muted/40'}>{verse ? verse.hindi : '—'}</span>
                 </div>
               </>
             ) : (
               <div className="self-end text-sm">
                 {quote ? (
                   <>
-                    <span className="mr-2 text-[#e8c874]">{quote.kicker}</span>
-                    <span className="text-[#a89f8d]">· {quote.attribution}</span>
+                    <span className="mr-2 text-accent-text">{quote.kicker}</span>
+                    <span className="text-muted">· {quote.attribution}</span>
                   </>
                 ) : (
-                  <span className="text-[#a89f8d]/40">{customLoaded ? 'quote not found' : '—'}</span>
+                  <span className="text-muted/40">{customLoaded ? 'quote not found' : '—'}</span>
                 )}
               </div>
             )}
           </div>
-          <p className="mt-3 text-xs text-[#a89f8d]">
-            <Link href="/quotes" className="text-[#e8c874] transition-colors hover:underline">
+          <p className="mt-3 text-xs text-muted">
+            <Link href="/quotes" className="text-accent-text transition-colors hover:underline">
               manage on /quotes
             </Link>
           </p>
@@ -562,7 +562,7 @@ export default function StudioPage() {
                 >
                   {running ? 'Rendering…' : 'Render this cut'}
                 </button>
-                <span className="text-xs text-[#a89f8d]">
+                <span className="text-xs text-muted">
                   {problem ?? (running
                     ? 'dry run — nothing is posted; takes a couple of minutes'
                     : 'dry run — renders out/reel.mp4 with these unsaved edits')}
@@ -573,7 +573,7 @@ export default function StudioPage() {
                 <pre
                   ref={logRef}
                   data-testid="render-log"
-                  className="mt-4 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[#0d0817] p-3 font-mono text-[11px] leading-relaxed text-[#a89f8d] ring-1 ring-white/5"
+                  className="mt-4 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-video p-3 font-mono text-[11px] leading-relaxed text-muted ring-1 ring-line"
                 >
                   {log || 'starting…'}
                 </pre>
@@ -588,7 +588,7 @@ export default function StudioPage() {
                   <AddToCalendar sourceRef={renderedRef} />
                 </>
               )}
-              {done === false && <p className="mt-3 text-sm text-red-400">failed — log above</p>}
+              {done === false && <p className="mt-3 text-sm text-danger">failed — log above</p>}
             </section>
           </div>
         </div>

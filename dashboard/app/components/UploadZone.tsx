@@ -37,8 +37,8 @@ export function UploadZone() {
   }
 
   return (
-    <section className="rounded-xl bg-[#161028] p-4 ring-1 ring-white/5">
-      <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#a89f8d]">Upload backgrounds</h2>
+    <section className="rounded-xl border border-line bg-surface p-4">
+      <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted">Upload backgrounds</h2>
 
       <input
         ref={inputRef}
@@ -67,19 +67,19 @@ export function UploadZone() {
           void upload(e.dataTransfer.files);
         }}
         disabled={busy}
-        className={`mt-3 flex w-full flex-col items-center gap-1 rounded-lg border-2 border-dashed px-4 py-10 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e8c874]/60 disabled:cursor-progress ${
+        className={`mt-3 flex w-full flex-col items-center gap-1 rounded-lg border-2 border-dashed px-4 py-10 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-progress ${
           over
-            ? 'border-[#e8c874] bg-[#e8c874]/10'
-            : 'border-[#e8c874]/30 hover:border-[#e8c874]/60 hover:bg-[#e8c874]/5'
+            ? 'border-accent bg-accent/10'
+            : 'border-accent/50 hover:bg-accent/5'
         }`}
       >
-        <span className="text-sm text-[#f5efe0]">
+        <span className="text-sm text-fg">
           {busy ? 'Uploading…' : 'Drop images here, or click to pick'}
         </span>
-        <span className="text-xs text-[#a89f8d]">jpg / png / webp · up to 15 MB · resized to 1080×1920</span>
+        <span className="text-xs text-muted">jpg / png / webp · up to 15 MB · resized to 1080×1920</span>
       </button>
 
-      <p className="mt-2 text-xs text-[#a89f8d]">
+      <p className="mt-2 text-xs text-muted">
         Upload only images you have the right to use — they&rsquo;re recorded as user-provided in the licensing
         manifest.
       </p>
@@ -87,8 +87,8 @@ export function UploadZone() {
       {results.length > 0 && (
         <ul className="mt-3 space-y-1 text-xs">
           {results.map((r, i) => (
-            <li key={`${r.name}-${i}`} className={r.ok ? 'text-[#a89f8d]' : 'text-red-400'}>
-              <span className="text-[#f5efe0]">{r.name}</span>
+            <li key={`${r.name}-${i}`} className={r.ok ? 'text-muted' : 'text-danger'}>
+              <span className="text-fg">{r.name}</span>
               {' — '}
               {r.text}
             </li>

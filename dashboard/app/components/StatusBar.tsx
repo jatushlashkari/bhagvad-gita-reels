@@ -21,9 +21,9 @@ function refLabel(ref: string): string {
 
 function Chip({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg bg-[#0d0817] px-3 py-2 ring-1 ring-white/5">
-      <dt className="text-[10px] uppercase tracking-[0.18em] text-[#a89f8d]">{label}</dt>
-      <dd className="mt-1 flex items-baseline gap-2 text-lg text-[#f5efe0] tabular-nums">{children}</dd>
+    <div className="rounded-lg bg-surface-2 px-3 py-2 ring-1 ring-line">
+      <dt className="text-[10px] uppercase tracking-[0.18em] text-muted">{label}</dt>
+      <dd className="mt-1 flex items-baseline gap-2 text-lg text-fg tabular-nums">{children}</dd>
     </div>
   );
 }
@@ -82,14 +82,14 @@ export function StatusBar() {
   const calendarMode = calendar?.mode === 'calendar';
 
   return (
-    <section className="rounded-xl bg-[#161028] p-4 ring-1 ring-white/5">
+    <section className="rounded-xl border border-line bg-surface p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#a89f8d]">Status</h2>
+        <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted">Status</h2>
         <button
           type="button"
           onClick={runSync}
           disabled={syncing}
-          className="rounded-lg bg-[#e8c874] px-3 py-1.5 text-sm font-medium text-[#0d0817] transition-colors hover:bg-[#f2d894] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e8c874]/60 disabled:opacity-50"
+          className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-ink transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-50"
         >
           {syncing ? 'Syncing…' : 'Sync to GitHub'}
         </button>
@@ -100,25 +100,25 @@ export function StatusBar() {
           {posted ? (
             <>
               <span>{refLabel(posted.ref)}</span>
-              <span className="text-xs text-[#a89f8d]">
-                <span className={posted.youtube ? 'text-[#e8c874]' : 'opacity-40'}>
+              <span className="text-xs text-muted">
+                <span className={posted.youtube ? 'text-accent-text' : 'opacity-40'}>
                   {posted.youtube ? '✔' : '·'} YT
                 </span>
                 <span className="mx-1 opacity-30">|</span>
-                <span className={posted.instagram ? 'text-[#e8c874]' : 'opacity-40'}>
+                <span className={posted.instagram ? 'text-accent-text' : 'opacity-40'}>
                   {posted.instagram ? '✔' : '·'} IG
                 </span>
               </span>
             </>
           ) : (
-            <span className="text-base text-[#a89f8d]">nothing posted yet</span>
+            <span className="text-base text-muted">nothing posted yet</span>
           )}
         </Chip>
         <Chip label="next verse">
           {state?.nextRef ? (
-            <span className="text-[#e8c874]">{refLabel(state.nextRef)}</span>
+            <span className="text-accent-text">{refLabel(state.nextRef)}</span>
           ) : (
-            <span className="text-base text-[#a89f8d]">{state ? 'none queued' : '…'}</span>
+            <span className="text-base text-muted">{state ? 'none queued' : '…'}</span>
           )}
         </Chip>
         <Chip label="total posted">
@@ -128,33 +128,33 @@ export function StatusBar() {
           <Chip label="next scheduled">
             {next ? (
               <>
-                <span className="text-[#e8c874]">{next.time}</span>
-                <span className="text-xs text-[#a89f8d]">
+                <span className="text-accent-text">{next.time}</span>
+                <span className="text-xs text-muted">
                   {next.date} · {calendar?.config.timezone}
                 </span>
               </>
             ) : (
-              <span className="text-base text-[#a89f8d]">nothing scheduled</span>
+              <span className="text-base text-muted">nothing scheduled</span>
             )}
           </Chip>
         )}
       </dl>
 
       {sync && (
-        <div className={`mt-3 rounded-lg border ${sync.ok ? 'border-white/10' : 'border-red-500/70'}`}>
+        <div className={`mt-3 rounded-lg border ${sync.ok ? 'border-line' : 'border-danger/70'}`}>
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}
             aria-expanded={open}
-            className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs text-[#a89f8d] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e8c874]/60"
+            className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           >
-            <span className={sync.ok ? 'text-[#a89f8d]' : 'text-red-400'}>
+            <span className={sync.ok ? 'text-muted' : 'text-danger'}>
               {sync.ok ? 'sync ok' : 'sync failed'} — git output
             </span>
             <span aria-hidden className="opacity-60">{open ? '▾' : '▸'}</span>
           </button>
           {open && (
-            <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words border-t border-white/5 px-3 py-2 font-mono text-[11px] leading-relaxed text-[#a89f8d]">
+            <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words border-t border-line px-3 py-2 font-mono text-[11px] leading-relaxed text-muted">
               {sync.output || '(no output)'}
             </pre>
           )}

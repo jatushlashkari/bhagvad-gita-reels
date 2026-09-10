@@ -27,16 +27,16 @@ export function Library() {
   const images = assets.length - clips;
 
   return (
-    <section className="rounded-xl bg-[#161028] p-4 ring-1 ring-white/5">
+    <section className="rounded-xl border border-line bg-surface p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#a89f8d]">Background library</h2>
-        <p className="text-xs text-[#a89f8d]">
+        <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted">Background library</h2>
+        <p className="text-xs text-muted">
           {clips} clip{clips === 1 ? '' : 's'} · {images} image{images === 1 ? '' : 's'}
         </p>
       </div>
 
       {assets.length === 0 ? (
-        <p className="mt-4 text-sm text-[#a89f8d]">No backgrounds yet — upload an image above.</p>
+        <p className="mt-4 text-sm text-muted">No backgrounds yet — upload an image above.</p>
       ) : (
         <ul className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
           {assets.map((a) => (
@@ -50,7 +50,7 @@ export function Library() {
                       src={`/api/media/public/${a.rel}`}
                       alt={a.file}
                       loading="lazy"
-                      className="aspect-[9/16] w-full rounded-lg object-cover ring-1 ring-white/5"
+                      className="aspect-[9/16] w-full rounded-lg object-cover ring-1 ring-line"
                     />
                   ) : (
                     <video
@@ -64,17 +64,17 @@ export function Library() {
                         e.currentTarget.pause();
                         e.currentTarget.currentTime = 0;
                       }}
-                      className="aspect-[9/16] w-full rounded-lg object-cover ring-1 ring-white/5"
+                      className="aspect-[9/16] w-full rounded-lg object-cover ring-1 ring-line"
                     />
                   )}
                   {a.kind === 'clip' && (
-                    <span className="pointer-events-none absolute bottom-1 right-1 rounded bg-[#0d0817]/80 px-1 text-[9px] text-[#e8c874]">
+                    <span className="pointer-events-none absolute bottom-1 right-1 rounded bg-fg/20 px-1 text-[9px] text-accent-text">
                       ▶
                     </span>
                   )}
                 </div>
-                <figcaption className="mt-1 text-[10px] text-[#a89f8d]">
-                  <span className="block truncate text-[#f5efe0]" title={a.file}>
+                <figcaption className="mt-1 text-[10px] text-muted">
+                  <span className="block truncate text-fg" title={a.file}>
                     {a.file}
                   </span>
                   <span className="block truncate" title={a.license}>

@@ -1,6 +1,6 @@
 'use client';
 import { BEAT_MAX, BEAT_MIN, BEAT_MAX_CHARS, NO_EMOJI } from '../../../../shared/beats.ts';
-import { buttonClass, headingClass, iconButtonClass, panelClass } from './ui.tsx';
+import { buttonClass, headingClass, iconButtonClass, panelClass } from '../ui.tsx';
 
 // Single-sourced from shared/beats.ts so UI, API, and CLI can never drift.
 export const MAX_BEATS = BEAT_MAX;
@@ -55,7 +55,7 @@ export function BeatsEditor({
         <span
           data-testid="beats-badge"
           className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-[0.14em] ${
-            curated ? 'bg-[#e8c874]/15 text-[#e8c874]' : 'bg-white/5 text-[#a89f8d]'
+            curated ? 'bg-accent/15 text-accent-text' : 'bg-surface-2 text-muted'
           }`}
         >
           {curated ? 'curated' : 'auto'}
@@ -67,20 +67,20 @@ export function BeatsEditor({
           const atLimit = b.length >= MAX_BEAT_CHARS;
           return (
             <li key={i} className="flex items-start gap-2">
-              <span className="mt-2.5 w-3 shrink-0 text-right text-[10px] tabular-nums text-[#a89f8d]">{i + 1}</span>
+              <span className="mt-2.5 w-3 shrink-0 text-right text-[10px] tabular-nums text-muted">{i + 1}</span>
               <div className="min-w-0 flex-1">
                 <input
                   aria-label={`beat ${i + 1}`}
                   value={b}
                   maxLength={MAX_BEAT_CHARS}
                   onChange={(e) => replace(i, e.target.value)}
-                  className={`w-full rounded-lg border bg-[#0d0817] px-3 py-2 text-sm text-[#f5efe0] focus:outline-none focus:ring-2 focus:ring-[#e8c874]/40 ${
-                    atLimit ? 'border-red-500/60' : 'border-white/10 focus:border-[#e8c874]/60'
+                  className={`w-full rounded-lg border bg-surface px-3 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-accent/40 ${
+                    atLimit ? 'border-danger/60' : 'border-line focus:border-accent'
                   }`}
                 />
                 <span
                   className={`mt-1 block text-right text-[10px] tabular-nums ${
-                    atLimit ? 'text-red-400' : 'text-[#a89f8d]/70'
+                    atLimit ? 'text-danger' : 'text-muted/70'
                   }`}
                 >
                   {b.length}/{MAX_BEAT_CHARS}
@@ -132,9 +132,9 @@ export function BeatsEditor({
         <button type="button" className={buttonClass} disabled={saving || problem !== null} onClick={onSave}>
           {saving ? 'Saving…' : 'Save beats'}
         </button>
-        {problem && <span className="text-xs text-red-400">{problem}</span>}
+        {problem && <span className="text-xs text-danger">{problem}</span>}
         {!problem && status && (
-          <span className={`text-xs ${status.ok ? 'text-[#a89f8d]' : 'text-red-400'}`}>{status.text}</span>
+          <span className={`text-xs ${status.ok ? 'text-muted' : 'text-danger'}`}>{status.text}</span>
         )}
       </div>
     </section>

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { REF_PATTERN } from '../../../../shared/custom-quotes.ts';
 import { DEFAULT_SCHEDULE_CONFIG, addDays, localDateOf } from '../../../../shared/schedule.ts';
 import type { CalendarView } from '../../../lib/backend.ts';
-import { ghostButtonClass, labelClass, selectClass } from '../studio/ui.tsx';
+import { ghostButtonClass, labelClass, selectClass } from '../ui.tsx';
 import { BUSY } from './CalendarTable.tsx';
 
 /** Same reader as GeneratePanel's, the Studio's and the Quotes page's: the routes answer
@@ -108,7 +108,7 @@ export function AddToCalendar({ sourceRef }: { sourceRef: string }) {
   }
 
   return (
-    <div className="mt-4 border-t border-white/5 pt-4">
+    <div className="mt-4 border-t border-line pt-4">
       <div className="flex flex-wrap items-end gap-3">
         <label className="block">
           <span className={labelClass}>date</span>
@@ -123,7 +123,7 @@ export function AddToCalendar({ sourceRef }: { sourceRef: string }) {
         <button type="button" className={`${ghostButtonClass} mb-0.5`} disabled={running || !date} onClick={() => void add()}>
           {running ? 'Adding…' : 'Add to calendar'}
         </button>
-        <span className="mb-2 text-xs text-[#a89f8d]">
+        <span className="mb-2 text-xs text-muted">
           {running
             ? 'archiving the release and cutting a thumbnail — a few seconds'
             : `schedules this cut for that day in ${tz}`}
@@ -134,20 +134,20 @@ export function AddToCalendar({ sourceRef }: { sourceRef: string }) {
         <pre
           ref={logRef}
           data-testid="add-log"
-          className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[#0d0817] p-3 font-mono text-[11px] leading-relaxed text-[#a89f8d] ring-1 ring-white/5"
+          className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-video p-3 font-mono text-[11px] leading-relaxed text-muted ring-1 ring-line"
         >
           {log || 'starting…'}
         </pre>
       )}
       {done === true && (
-        <p className="mt-3 text-sm text-[#a89f8d]">
+        <p className="mt-3 text-sm text-muted">
           scheduled —{' '}
-          <Link href="/calendar" className="text-[#e8c874] transition-colors hover:underline">
+          <Link href="/calendar" className="text-accent-text transition-colors hover:underline">
             open calendar
           </Link>
         </p>
       )}
-      {done === false && <p className="mt-3 text-sm text-red-400">failed — log above</p>}
+      {done === false && <p className="mt-3 text-sm text-danger">failed — log above</p>}
     </div>
   );
 }

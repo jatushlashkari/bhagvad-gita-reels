@@ -2,7 +2,7 @@
 import { Player } from '@remotion/player';
 import { CinemaReel } from '../../../../video/CinemaReel.tsx';
 import { FPS, HEIGHT, WIDTH, type ReelProps } from '../../../../shared/types.ts';
-import { headingClass, panelClass } from './ui.tsx';
+import { headingClass, panelClass } from '../ui.tsx';
 
 /**
  * The same `CinemaReel` component the render pipeline mounts, driven by the same
@@ -30,7 +30,7 @@ export function PreviewPane({
     <section className={panelClass}>
       <div className="flex items-baseline justify-between gap-3">
         <h2 className={headingClass}>Preview</h2>
-        <span className="text-xs tabular-nums text-[#a89f8d]">
+        <span className="text-xs tabular-nums text-muted">
           {error || !inputProps ? '—' : `${totalSec.toFixed(1)}s · ${durationInFrames}f`}
         </span>
       </div>
@@ -39,7 +39,7 @@ export function PreviewPane({
         {error ? (
           <p
             data-testid="timeline-error"
-            className="rounded-lg bg-[#0d0817] p-3 text-sm text-red-400 ring-1 ring-red-500/20"
+            className="rounded-lg bg-surface-2 p-3 text-sm text-danger ring-1 ring-danger/20"
           >
             {error}
           </p>
@@ -60,16 +60,16 @@ export function PreviewPane({
               // live). Starting paused makes the first click both the play and the gesture that
               // unblocks audio, so a music preview works on the very first play.
               acknowledgeRemotionLicense
-              className="rounded-lg ring-1 ring-white/10"
+              className="rounded-lg ring-1 ring-line"
               style={{ width: '100%' }}
             />
           </div>
         ) : (
-          <div className="aspect-[9/16] w-full animate-pulse rounded-lg bg-[#0d0817] ring-1 ring-white/5" />
+          <div className="aspect-[9/16] w-full animate-pulse rounded-lg bg-video ring-1 ring-line" />
         )}
       </div>
 
-      {note && <p className="mt-3 text-xs text-[#a89f8d]">{note}</p>}
+      {note && <p className="mt-3 text-xs text-muted">{note}</p>}
     </section>
   );
 }

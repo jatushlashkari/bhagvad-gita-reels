@@ -5,7 +5,7 @@ import { sortItems, type Platform, type ScheduleItem } from '../../../shared/sch
 import type { CalendarView, PostPatch } from '../../lib/backend.ts';
 import { BUSY, CalendarTable } from '../components/calendar/CalendarTable.tsx';
 import { PageHeader } from '../components/shell/PageHeader.tsx';
-import { headingClass, panelClass } from '../components/studio/ui.tsx';
+import { headingClass, panelClass } from '../components/ui.tsx';
 
 /** Same reader as GeneratePanel's, the Studio's and the Quotes page's: the routes answer
  *  `{ error }` JSON, but an unhandled server fault can still arrive as plain text or HTML — read
@@ -116,11 +116,11 @@ export default function CalendarPage() {
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <h2 className={headingClass}>Scheduled</h2>
             {view && (
-              <span className="flex items-center gap-2 text-xs text-[#a89f8d]">
+              <span className="flex items-center gap-2 text-xs text-muted">
                 <span
                   data-mode={view.mode}
                   className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-[0.14em] ring-1 ${
-                    view.mode === 'calendar' ? 'text-[#e8c874] ring-[#e8c874]/30' : 'text-[#a89f8d] ring-white/10'
+                    view.mode === 'calendar' ? 'text-accent-text ring-accent/30' : 'text-muted ring-line'
                   }`}
                 >
                   {view.mode} mode
@@ -133,17 +133,17 @@ export default function CalendarPage() {
           {/* Worth saying out loud: in daily mode the hourly workflow is switched off, so rows here
               sit untouched until config.json's `mode` says calendar. */}
           {view?.mode === 'daily' && (
-            <p className="mt-3 text-sm text-[#e8c874]/80">
+            <p className="mt-3 text-sm text-accent-text/80">
               config.json is in daily mode — the hourly publisher does not run, so nothing below goes out on its own.
             </p>
           )}
 
-          {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+          {error && <p className="mt-3 text-sm text-danger">{error}</p>}
 
           {view && view.items.length === 0 && (
-            <p className="mt-3 text-sm text-[#a89f8d]">
+            <p className="mt-3 text-sm text-muted">
               Nothing scheduled — the hourly publisher fills the next {view.config.daysAhead} days, or add a reel from{' '}
-              <Link href="/studio" className="text-[#e8c874] transition-colors hover:underline">
+              <Link href="/studio" className="text-accent-text transition-colors hover:underline">
                 Studio
               </Link>
               .
@@ -161,7 +161,7 @@ export default function CalendarPage() {
             />
           )}
 
-          {!view && !error && <p className="mt-3 text-sm text-[#a89f8d]">loading…</p>}
+          {!view && !error && <p className="mt-3 text-sm text-muted">loading…</p>}
         </section>
       </div>
     </>

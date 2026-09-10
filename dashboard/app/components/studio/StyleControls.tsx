@@ -1,9 +1,9 @@
 'use client';
 import { PROMPT_PREFIX_MAX, type ReelStyle } from '../../../../shared/reel-style.ts';
 import { BEAT_FONTS, FONT_LABELS, KICKER_FONTS } from '../../../../shared/font-map.ts';
-import { Field, Slider, Toggle, buttonClass, headingClass, panelClass, selectClass } from './ui.tsx';
+import { Field, Slider, Toggle, buttonClass, headingClass, panelClass, selectClass } from '../ui.tsx';
 
-const colorClass = 'h-9 w-full cursor-pointer rounded-lg border border-white/10 bg-[#0d0817] p-1';
+const colorClass = 'h-9 w-full cursor-pointer rounded-lg border border-line bg-surface p-1';
 
 export function StyleControls({
   style,
@@ -168,14 +168,14 @@ export function StyleControls({
         <button type="button" className={buttonClass} disabled={saving} onClick={onSave}>
           {saving ? 'Saving…' : 'Save as channel style'}
         </button>
-        <span className="text-xs text-[#a89f8d]">writes styles/cinema.json — every later render starts here</span>
+        <span className="text-xs text-muted">writes styles/cinema.json — every later render starts here</span>
       </div>
 
-      {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+      {error && <p className="mt-3 text-sm text-danger">{error}</p>}
       {saved && !error && (
         <pre
           data-testid="saved-style"
-          className="mt-3 max-h-56 overflow-auto rounded-lg bg-[#0d0817] p-3 font-mono text-[11px] leading-relaxed text-[#a89f8d] ring-1 ring-white/5"
+          className="mt-3 max-h-56 overflow-auto rounded-lg bg-surface-2 p-3 font-mono text-[11px] leading-relaxed text-muted ring-1 ring-line"
         >
           {JSON.stringify(saved, null, 2)}
         </pre>

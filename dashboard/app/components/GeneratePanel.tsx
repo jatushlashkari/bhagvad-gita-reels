@@ -18,14 +18,14 @@ async function errorDetail(res: Response): Promise<string> {
 }
 
 const selectClass =
-  'w-full rounded-lg border border-white/10 bg-[#0d0817] px-3 py-2 text-sm text-[#f5efe0] focus:border-[#e8c874]/60 focus:outline-none focus:ring-2 focus:ring-[#e8c874]/40';
+  'w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/40';
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="text-[10px] uppercase tracking-[0.18em] text-[#a89f8d]">
+      <span className="text-[10px] uppercase tracking-[0.18em] text-muted">
         {label}
-        {hint && <span className="ml-1 tracking-normal text-[#e8c874]/50">{hint}</span>}
+        {hint && <span className="ml-1 tracking-normal text-accent-text/50">{hint}</span>}
       </span>
       <span className="mt-1 block">{children}</span>
     </label>
@@ -39,11 +39,11 @@ function ReelPlayer() {
   const [src] = useState(() => `${REEL_URL}?t=${Date.now()}`);
   return (
     <div className="mt-4 flex flex-wrap items-end gap-4">
-      <video controls src={src} className="aspect-[9/16] w-64 rounded-xl ring-1 ring-white/10" />
+      <video controls src={src} className="aspect-[9/16] w-64 rounded-xl ring-1 ring-line" />
       <a
         href={src}
         download="reel.mp4"
-        className="rounded-lg border border-[#e8c874]/40 px-3 py-1.5 text-sm text-[#e8c874] transition-colors hover:bg-[#e8c874]/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e8c874]/60"
+        className="rounded-lg border border-accent/50 px-3 py-1.5 text-sm text-accent-text transition-colors hover:bg-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
       >
         Download
       </a>
@@ -129,8 +129,8 @@ export function GeneratePanel() {
   const clips = assets.filter((a) => a.kind === 'clip');
 
   return (
-    <section className="rounded-xl bg-[#161028] p-4 ring-1 ring-white/5">
-      <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#a89f8d]">Generate</h2>
+    <section className="rounded-xl border border-line bg-surface p-4">
+      <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted">Generate</h2>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="chapter" hint="अध्याय">
@@ -196,12 +196,12 @@ export function GeneratePanel() {
         </Field>
       </div>
 
-      <p className="mt-3 text-sm text-[#f5efe0]">
-        <span className="mr-2 text-[#e8c874] tabular-nums">गीता {ch}.{vs}</span>
+      <p className="mt-3 text-sm text-fg">
+        <span className="mr-2 text-accent-text tabular-nums">गीता {ch}.{vs}</span>
         {/* `preview` is null both before the first fetch resolves and on a 404, so the empty
             state stays neutral rather than flashing an error on load — every ref the selects
             can produce exists in sources/gita.json (all 18 chapters are 1..N contiguous). */}
-        <span className={preview ? 'text-[#a89f8d]' : 'text-[#a89f8d]/40'}>{preview ? preview.hindi : '—'}</span>
+        <span className={preview ? 'text-muted' : 'text-muted/40'}>{preview ? preview.hindi : '—'}</span>
       </p>
 
       <div className="mt-4 flex items-center gap-3">
@@ -209,11 +209,11 @@ export function GeneratePanel() {
           type="button"
           onClick={generate}
           disabled={running}
-          className="rounded-lg bg-[#e8c874] px-4 py-2 text-sm font-medium text-[#0d0817] transition-colors hover:bg-[#f2d894] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e8c874]/60 disabled:opacity-50"
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-ink transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-50"
         >
           {running ? 'Rendering…' : 'Generate'}
         </button>
-        <span className="text-xs text-[#a89f8d]">
+        <span className="text-xs text-muted">
           {running ? 'dry run — nothing is posted; takes a couple of minutes' : 'dry run — renders out/reel.mp4 only'}
         </span>
       </div>
@@ -221,14 +221,14 @@ export function GeneratePanel() {
       {(log || running) && (
         <pre
           ref={logRef}
-          className="mt-4 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[#0d0817] p-3 font-mono text-[11px] leading-relaxed text-[#a89f8d] ring-1 ring-white/5"
+          className="mt-4 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-video p-3 font-mono text-[11px] leading-relaxed text-muted ring-1 ring-line"
         >
           {log || 'starting…'}
         </pre>
       )}
 
       {done === true && <ReelPlayer />}
-      {done === false && <p className="mt-3 text-sm text-red-400">failed — log above</p>}
+      {done === false && <p className="mt-3 text-sm text-danger">failed — log above</p>}
     </section>
   );
 }

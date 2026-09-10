@@ -10,7 +10,7 @@ import {
   type ScheduleItem,
 } from '../../../../shared/schedule.ts';
 import type { PostPatch } from '../../../lib/backend.ts';
-import { iconButtonClass, labelClass, selectClass } from '../studio/ui.tsx';
+import { iconButtonClass, labelClass, selectClass } from '../ui.tsx';
 import { PostDrawer } from './PostDrawer.tsx';
 
 /** Every 409 from the calendar routes means one thing to whoever is looking at the table:
@@ -43,11 +43,11 @@ const cellClass = 'px-2 py-3 align-top';
 const headClass = `${labelClass} px-2 pb-2 text-left font-normal`;
 
 const STATUS_CLASS: Record<PostStatus, string> = {
-  draft: 'text-[#a89f8d] ring-white/10',
-  scheduled: 'text-[#e8c874] ring-[#e8c874]/30',
-  published: 'text-emerald-300 ring-emerald-400/30',
-  failed: 'text-red-400 ring-red-400/40',
-  skipped: 'text-[#a89f8d]/60 ring-white/10',
+  draft: 'text-warning ring-line',
+  scheduled: 'text-accent-text ring-accent/30',
+  published: 'text-success ring-success/30',
+  failed: 'text-danger ring-danger/40',
+  skipped: 'text-muted/60 ring-line',
 };
 
 const localStamp = (iso: string, tz: string) => {
@@ -227,7 +227,7 @@ export function CalendarTable({
     <div className="mt-3 overflow-x-auto">
       <table className="w-full min-w-[1040px] border-collapse text-sm">
         <thead>
-          <tr className="border-b border-white/10">
+          <tr className="border-b border-line">
             <th className={headClass}>reel</th>
             {PLATFORMS.map((p) => (
               <th key={p} className={headClass}>
@@ -245,7 +245,7 @@ export function CalendarTable({
             const expanded = drawer?.id === item.id || run?.id === item.id || rowError?.id === item.id;
             return (
               <Fragment key={item.id}>
-                <tr className="border-b border-white/5 align-top">
+                <tr className="border-b border-line align-top">
                   <td className={cellClass}>
                     <div className="flex gap-3">
                       {/* plain <img>, not next/image: thumbnails live in the repo's public/thumbs,
@@ -255,14 +255,14 @@ export function CalendarTable({
                         alt=""
                         loading="lazy"
                         width={40}
-                        className="h-auto w-10 shrink-0 rounded ring-1 ring-white/10"
+                        className="h-auto w-10 shrink-0 rounded ring-1 ring-line"
                       />
                       <div className="min-w-0">
-                        <p className="text-[#f5efe0]">{item.hook}</p>
-                        <p className="mt-1 text-xs text-[#a89f8d]">
-                          <span className="text-[#e8c874]">{item.ref}</span> · {item.format}
+                        <p className="text-fg">{item.hook}</p>
+                        <p className="mt-1 text-xs text-muted">
+                          <span className="text-accent-text">{item.ref}</span> · {item.format}
                         </p>
-                        <p className="text-xs text-[#a89f8d]/70">rendered {localStamp(item.renderedAt, tz)}</p>
+                        <p className="text-xs text-muted/70">rendered {localStamp(item.renderedAt, tz)}</p>
                       </div>
                     </div>
                   </td>
@@ -283,7 +283,7 @@ export function CalendarTable({
                           <span
                             data-status={post.status}
                             title={post.error}
-                            className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-[0.14em] ring-1 ${STATUS_CLASS[post.status]}`}
+                            className={`rounded bg-surface-2 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.14em] ring-1 ${STATUS_CLASS[post.status]}`}
                           >
                             {post.status}
                           </span>
@@ -333,7 +333,7 @@ export function CalendarTable({
                             </button>
                           )}
                         </div>
-                        {post.error && <p className="mt-1 max-w-56 text-[11px] text-red-400">{post.error}</p>}
+                        {post.error && <p className="mt-1 max-w-56 text-[11px] text-danger">{post.error}</p>}
                       </td>
                     );
                   })}
@@ -367,9 +367,9 @@ export function CalendarTable({
                 {/* The expanded area is a sibling <tr> rather than nested markup: a table row may
                     only hold cells, and both the drawer and the log want the full width. */}
                 {expanded && (
-                  <tr className="border-b border-white/5 bg-[#0d0817]/60">
+                  <tr className="border-b border-line bg-surface-2/60">
                     <td className={cellClass} colSpan={PLATFORMS.length + 2}>
-                      {rowError?.id === item.id && <p className="text-sm text-red-400">{rowError.text}</p>}
+                      {rowError?.id === item.id && <p className="text-sm text-danger">{rowError.text}</p>}
                       {drawer?.id === item.id && (
                         <PostDrawer
                           key={`${item.id}:${drawer.platform}`}
@@ -385,17 +385,17 @@ export function CalendarTable({
                           <pre
                             ref={logRef}
                             data-testid="calendar-log"
-                            className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[#0d0817] p-3 font-mono text-[11px] leading-relaxed text-[#a89f8d] ring-1 ring-white/5"
+                            className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-video p-3 font-mono text-[11px] leading-relaxed text-muted ring-1 ring-line"
                           >
                             {run.text || 'starting…'}
                           </pre>
                           {run.done === true && (
-                            <p className="mt-2 text-xs text-[#a89f8d]">
+                            <p className="mt-2 text-xs text-muted">
                               {run.label} finished — the row above carries the outcome
                             </p>
                           )}
                           {run.done === false && (
-                            <p className="mt-2 text-sm text-red-400">{run.label} failed — log above</p>
+                            <p className="mt-2 text-sm text-danger">{run.label} failed — log above</p>
                           )}
                         </div>
                       )}

@@ -1,7 +1,7 @@
 'use client';
 import { useRef, useState } from 'react';
 import type { ReelStyle } from '../../../../shared/reel-style.ts';
-import { Field, ghostButtonClass, headingClass, labelClass, panelClass, selectClass } from './ui.tsx';
+import { Field, ghostButtonClass, headingClass, labelClass, panelClass, selectClass } from '../ui.tsx';
 
 export type Asset = { file: string; rel: string; kind: 'clip' | 'image' | 'music'; license: string };
 
@@ -86,7 +86,7 @@ export function MediaControls({
     <section className={panelClass}>
       <h2 className={headingClass}>Media</h2>
 
-      <p className="mt-3 text-[10px] uppercase tracking-[0.18em] text-[#a89f8d]">background</p>
+      <p className="mt-3 text-[10px] uppercase tracking-[0.18em] text-muted">background</p>
       <ul className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-6">
         <li>
           <button
@@ -94,8 +94,8 @@ export function MediaControls({
             aria-label="background auto"
             aria-pressed={background === ''}
             onClick={() => onBackground('')}
-            className={`flex aspect-[9/16] w-full items-center justify-center rounded-lg bg-[#0d0817] text-center text-[10px] leading-tight text-[#a89f8d] ring-1 transition-colors ${
-              background === '' ? 'ring-2 ring-[#e8c874]' : 'ring-white/10 hover:ring-white/25'
+            className={`flex aspect-[9/16] w-full items-center justify-center rounded-lg bg-video text-center text-[10px] leading-tight text-muted ring-1 transition-colors ${
+              background === '' ? 'ring-2 ring-accent' : 'ring-line hover:ring-line'
             }`}
           >
             Auto
@@ -112,7 +112,7 @@ export function MediaControls({
               onClick={() => onBackground(a.file)}
               title={`${a.file} — ${a.license}`}
               className={`block w-full overflow-hidden rounded-lg ring-1 transition-colors ${
-                background === a.file ? 'ring-2 ring-[#e8c874]' : 'ring-white/10 hover:ring-white/25'
+                background === a.file ? 'ring-2 ring-accent' : 'ring-line hover:ring-line'
               }`}
             >
               {a.kind === 'image' ? (
@@ -152,15 +152,15 @@ export function MediaControls({
         {copied === null ? 'Copy' : copied ? 'Copied' : 'Copy failed'}
       </button>
 
-      <p className="mt-5 text-[10px] uppercase tracking-[0.18em] text-[#a89f8d]">music</p>
+      <p className="mt-5 text-[10px] uppercase tracking-[0.18em] text-muted">music</p>
       <div className="mt-2 flex flex-wrap gap-4">
         {MUSIC_MODES.map((m) => (
-          <label key={m.value} className="flex items-center gap-2 text-sm text-[#f5efe0]">
+          <label key={m.value} className="flex items-center gap-2 text-sm text-fg">
             <input
               type="radio"
               name="music-mode"
               aria-label={`music ${m.value}`}
-              className="size-4 accent-[#e8c874]"
+              className="size-4 accent-accent"
               checked={style.musicMode === m.value}
               onChange={() => onChange({ musicMode: m.value })}
             />
@@ -198,16 +198,16 @@ export function MediaControls({
               const f = e.target.files?.[0];
               if (f) void upload(f);
             }}
-            className={`${ghostButtonClass} block w-full cursor-pointer file:mr-3 file:cursor-pointer file:rounded file:border-0 file:bg-[#e8c874]/15 file:px-2 file:py-1 file:text-[#e8c874]`}
+            className={`${ghostButtonClass} block w-full cursor-pointer file:mr-3 file:cursor-pointer file:rounded file:border-0 file:bg-accent/15 file:px-2 file:py-1 file:text-accent-text`}
           />
         </Field>
       </div>
 
-      {uploading && <p className="mt-2 text-xs text-[#a89f8d]">uploading…</p>}
-      {uploadError && <p className="mt-2 text-sm text-red-400">{uploadError}</p>}
-      {style.musicMode === 'rotation' && <p className="mt-3 text-xs text-[#e8c874]/70">{ROTATION_NOTE}</p>}
+      {uploading && <p className="mt-2 text-xs text-muted">uploading…</p>}
+      {uploadError && <p className="mt-2 text-sm text-danger">{uploadError}</p>}
+      {style.musicMode === 'rotation' && <p className="mt-3 text-xs text-accent-text/70">{ROTATION_NOTE}</p>}
       {style.musicMode === 'track' && tracks.length === 0 && (
-        <p className="mt-3 text-xs text-[#a89f8d]">no tracks in the pool yet — add an mp3 above</p>
+        <p className="mt-3 text-xs text-muted">no tracks in the pool yet — add an mp3 above</p>
       )}
     </section>
   );

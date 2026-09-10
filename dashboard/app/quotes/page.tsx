@@ -6,7 +6,7 @@ import type { QuoteRow } from '../../lib/backend.ts';
 import { CustomQuoteForm, type CustomQuoteDraft } from '../components/quotes/CustomQuoteForm.tsx';
 import { QuotesTable } from '../components/quotes/QuotesTable.tsx';
 import { PageHeader } from '../components/shell/PageHeader.tsx';
-import { ghostButtonClass, headingClass, iconButtonClass, panelClass } from '../components/studio/ui.tsx';
+import { ghostButtonClass, headingClass, iconButtonClass, panelClass } from '../components/ui.tsx';
 
 /** Same reader as the Studio's and GeneratePanel's: the routes answer `{ error }` JSON, but an
  *  unhandled server fault can still arrive as plain text or HTML — read the body once and
@@ -157,31 +157,31 @@ export default function QuotesPage() {
       <div className="space-y-6">
         <section className={panelClass}>
           <h2 className={headingClass}>Bhagavad Gita</h2>
-          {tableError && <p className="mt-3 text-sm text-red-400">{tableError}</p>}
+          {tableError && <p className="mt-3 text-sm text-danger">{tableError}</p>}
           <QuotesTable rows={rows} onFavorite={favorite} onSaveBeats={saveBeats} />
         </section>
 
         <section className={panelClass}>
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <h2 className={headingClass}>Custom quotes</h2>
-            <span className="text-xs tabular-nums text-[#a89f8d]">{customQuotes.length} in sources/custom-quotes.json</span>
+            <span className="text-xs tabular-nums text-muted">{customQuotes.length} in sources/custom-quotes.json</span>
           </div>
 
           {customQuotes.length === 0 ? (
-            <p className="mt-3 text-sm text-[#a89f8d]">
+            <p className="mt-3 text-sm text-muted">
               None yet — write one below and it joins the Studio&rsquo;s source list.
             </p>
           ) : (
             <ul className="mt-3 space-y-3">
               {customQuotes.map((q) => (
-                <li key={q.id} className="rounded-lg bg-[#0d0817] p-3 ring-1 ring-white/5">
+                <li key={q.id} className="rounded-lg bg-surface-2 p-3 ring-1 ring-line">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-sm text-[#f5efe0]">{q.lines.join(' · ')}</p>
-                      <p className="mt-1 text-xs text-[#a89f8d]">
-                        <span className="text-[#e8c874]">{q.kicker}</span> · {q.attribution}
+                      <p className="text-sm text-fg">{q.lines.join(' · ')}</p>
+                      <p className="mt-1 text-xs text-muted">
+                        <span className="text-accent-text">{q.kicker}</span> · {q.attribution}
                       </p>
-                      <p className="mt-1 text-xs text-[#a89f8d]/70">
+                      <p className="mt-1 text-xs text-muted/70">
                         {q.prompt
                           ? `${q.prompt.slice(0, 90)}${q.prompt.length > 90 ? '…' : ''}`
                           : 'no image prompt — generic theme fallback'}

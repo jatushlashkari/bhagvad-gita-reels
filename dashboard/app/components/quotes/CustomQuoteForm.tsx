@@ -18,7 +18,7 @@ import {
   iconButtonClass,
   panelClass,
   selectClass,
-} from '../studio/ui.tsx';
+} from '../ui.tsx';
 
 export type CustomQuoteDraft = { lines: string[]; attribution: string; kicker: string; prompt: string };
 
@@ -64,7 +64,7 @@ export function CustomQuoteForm({
       <ul className="mt-3 space-y-2">
         {lines.map((l, i) => (
           <li key={i} className="flex items-center gap-2">
-            <span className="w-3 shrink-0 text-right text-[10px] tabular-nums text-[#a89f8d]">{i + 1}</span>
+            <span className="w-3 shrink-0 text-right text-[10px] tabular-nums text-muted">{i + 1}</span>
             <input
               aria-label={`line ${i + 1}`}
               value={l}
@@ -174,11 +174,11 @@ export function CustomQuoteForm({
             Cancel
           </button>
         )}
-        {problem && <span className="text-xs text-red-400">{problem}</span>}
+        {problem && <span className="text-xs text-danger">{problem}</span>}
         {/* Not gated on `problem` the way BeatsEditor gates its status: a save resets this form to
             a blank one, whose "every line needs text" would otherwise swallow the confirmation
             (and the same for a delete, which has no form of its own). */}
-        {status && <span className={`text-xs ${status.ok ? 'text-[#a89f8d]' : 'text-red-400'}`}>{status.text}</span>}
+        {status && <span className={`text-xs ${status.ok ? 'text-muted' : 'text-danger'}`}>{status.text}</span>}
       </div>
     </section>
   );

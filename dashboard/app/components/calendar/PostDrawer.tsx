@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { CAPTION_MAX, TITLE_MAX, type Platform, type PostRecord } from '../../../../shared/schedule.ts';
 import type { PostPatch } from '../../../lib/backend.ts';
-import { ghostButtonClass, labelClass, selectClass } from '../studio/ui.tsx';
+import { ghostButtonClass, labelClass, selectClass } from '../ui.tsx';
 
 /** The text editor for one platform's post: the caption every platform posts, plus YouTube's
  *  separate title. Mounted per (row, platform) — the table keys it on both — so the draft always
@@ -41,14 +41,14 @@ export function PostDrawer({
   }
 
   return (
-    <div className="rounded-lg bg-[#0d0817] p-3 ring-1 ring-white/5">
+    <div className="rounded-lg bg-surface-2 p-3 ring-1 ring-line">
       <p className={labelClass}>{platform} post</p>
 
       {platform === 'youtube' && (
         <label className="mt-3 block">
           <span className="flex items-baseline justify-between">
             <span className={labelClass}>title</span>
-            <span className="text-[11px] tabular-nums text-[#a89f8d]">
+            <span className="text-[11px] tabular-nums text-muted">
               {title.length} / {TITLE_MAX}
             </span>
           </span>
@@ -65,7 +65,7 @@ export function PostDrawer({
       <label className="mt-3 block">
         <span className="flex items-baseline justify-between">
           <span className={labelClass}>caption</span>
-          <span className="text-[11px] tabular-nums text-[#a89f8d]">
+          <span className="text-[11px] tabular-nums text-muted">
             {caption.length} / {CAPTION_MAX}
           </span>
         </span>
@@ -86,7 +86,7 @@ export function PostDrawer({
         <button type="button" className={ghostButtonClass} onClick={onClose}>
           Cancel
         </button>
-        {error && <span className="text-xs text-red-400">{error}</span>}
+        {error && <span className="text-xs text-danger">{error}</span>}
       </div>
     </div>
   );
