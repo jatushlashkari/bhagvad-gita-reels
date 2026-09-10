@@ -70,7 +70,17 @@ npm test && npm run typecheck                    # checks
 
 ## Dashboard
 
-A local control room for the pipeline — upload backgrounds, generate/preview any verse on demand, and push new backgrounds into the daily rotation, all from a browser instead of the CLI.
+A local admin panel for the pipeline — light by default, dark on request — with a left-hand
+sidebar and six pages, all from a browser instead of the CLI:
+
+- **Overview** (`/`) — where the channel stands, and a quick render.
+- **Studio** (`/studio`) — a live preview of the exact render; tune this cut before you render it.
+- **Quotes** (`/quotes`) — every verse, your favourites, and your own custom quotes.
+- **Calendar** (`/calendar`) — what goes out, where, and when.
+- **Library** (`/library`) — the backgrounds and music the reels draw from.
+- **Settings** (`/settings`) — everything the reels and the automation read.
+
+A light/dark toggle sits in the sidebar; the choice is remembered per-browser.
 
 ```bash
 npm install --prefix dashboard   # one-time
@@ -79,9 +89,11 @@ npm run dashboard                # http://localhost:4000
 
 On your phone, open the same URL with your Mac's LAN IP instead of `localhost` (e.g. `http://192.168.1.23:4000` — find it via System Settings → WiFi → Details, or `ipconfig getifaddr en0`), as long as the phone is on the same WiFi; the dev server listens on all interfaces.
 
-- **Upload** a background image (jpg/png/webp, ≤15 MB) — it's resized to 1080×1920 and recorded as `"User-provided"` in `public/assets/manifest.json`, the same licensing ledger the CC0/CC BY footage uses.
-- **Generate** renders any verse on demand — optionally pinned to one background from the pool — with a live streaming log and a playable/downloadable result. It's a dry run: nothing is posted, `state.json` is untouched.
-- **Sync** commits the uploaded images + manifest, the saved style and curated beats, your quote favorites and custom quotes, and the calendar itself (`styles/cinema.json`, `sources/beats.json`, `sources/quotes-meta.json`, `sources/custom-quotes.json`, `schedule.json`, `public/thumbs/`) — then pushes, so the next scheduled run picks it all up.
+- **Upload**, on Library, takes a background image (jpg/png/webp, ≤15 MB) — it's resized to 1080×1920 and recorded as `"User-provided"` in `public/assets/manifest.json`, the same licensing ledger the CC0/CC BY footage uses.
+- **Generate**, on Overview, renders any verse on demand — optionally pinned to one background from the pool — with a live streaming log and a playable/downloadable result. It's a dry run: nothing is posted, `state.json` is untouched.
+- **Settings** edits `config.json` (handle, default format, start verse, daily-mode platforms, mode), the publishing schedule (days ahead, per-platform times, timezone), and the channel style (`styles/cinema.json`) that every cinema render starts from — Studio can override it for one render at a time (see Studio below).
+- **Connections**, the fourth card on Settings, is read-only: which platform secrets exist on this machine (`.env`) and, when `gh` is available, in the repo's GitHub Actions, plus whether the `daily-reel` and `publisher` workflows are enabled. The panel never writes a secret — set them yourself with `gh secret set` and `.env`, per SETUP.md.
+- **Sync**, on Overview, commits the uploaded images + manifest, the saved channel settings and style, curated beats, your quote favorites and custom quotes, and the calendar itself (`config.json`, `styles/cinema.json`, `sources/beats.json`, `sources/quotes-meta.json`, `sources/custom-quotes.json`, `schedule.json`, `public/thumbs/`) — then pushes, so the next scheduled run picks it all up.
 
 Only one render runs at a time; a second Generate while one is in flight is rejected until the first finishes.
 
@@ -92,22 +104,25 @@ fed by the same code the render uses, so what you see is what gets rendered.
 
 - **Beats** — edit the on-screen text per beat (2–6 of them), reorder, or add/remove; the preview
   updates as you type.
-- **Look** — a beat font (six faces: Archivo Black, Noto Serif, Cinzel, Playfair Display,
+- **Look — this render only** — starts from the saved channel style and lets you tweak, just for
+  this cut, a beat font (six faces: Archivo Black, Noto Serif, Cinzel, Playfair Display,
   Montserrat, Bebas Neue) and a separate kicker font (Noto Serif, Cinzel or Montserrat) for the
   top line and the closing-card handle, text/accent colors, scrim strength, timing, Ken Burns,
   kicker/handle toggles, the beat **transition** — crossfade (the next beat overlaps as this one
   fades out) or sequential (this beat fades fully out, the image holds alone for a **gap**, then
   the next beat fades in) — with its **fade** and **gap** lengths, and a **prompt prefix** (the
-  art-direction line every image prompt starts with — see Image prompts below). **Save as channel
-  style** writes the preset to `styles/cinema.json`, which every cinema render (Studio's own
-  **Render** button and the scheduled pipeline, daily or calendar) reads from. It's a normal
-  file in the repo, so it travels with the dashboard's **Sync** like the background library does.
+  art-direction line every image prompt starts with — see Image prompts below). A **modified**
+  badge appears as soon as you diverge from the saved style, and **Reset to channel style**
+  discards the changes. The style itself — the preset in `styles/cinema.json` that every cinema
+  render (the scheduled pipeline, daily or calendar, and any other Studio session) starts from,
+  and that travels with the dashboard's **Sync** — is edited on **Settings**, not here; a link in
+  this panel jumps straight there.
 - **Media** — pick a background from the pool, and set music mode: silent, a specific track, or
   rotation (silent in the preview — the daily pick is deterministic per verse and happens
   server-side). Upload your own mp3 from the same panel.
 - **Render** in Studio is always a dry run with your current edits layered on as one-off overrides
-  — nothing is posted, `state.json` is untouched, and it never changes `styles/cinema.json` by
-  itself (only **Save as channel style** does that).
+  — nothing is posted, `state.json` is untouched, and `styles/cinema.json` is never touched from
+  here; only Settings' **Channel style** card writes it.
 
 Uploaded music stays on this machine — `public/assets/music/` is gitignored, so **Sync** never
 pushes it. The scheduled cloud run can't use `musicMode: "track"` until that track is committed or
@@ -212,11 +227,12 @@ whatever AI art tool you use — the pipeline never calls one. It's a curated bo
 exists, else the verse's chapter theme plus a few motif words lifted from its hook beat. Either way
 it's prefixed with the style's **prompt prefix** (the art-direction line, e.g. "Cinematic
 devotional painting, ultra-detailed, richly coloured, no text —") — just another field on the
-saved style, so changing it in Studio's **Look** panel and saving re-styles every prompt at once.
+saved style, so changing it on Settings' **Channel style** card re-styles every prompt at once;
+tweaking it in Studio's **Look** panel previews the effect for this render only, without saving it.
 
 Copy a prompt from the `/quotes` table (per verse) or from Studio's **Media** panel (the current
 source's prompt, live as you edit beats or the prefix) — both have a **Copy** button. Paste it into
-your AI art tool, then upload the result from the control room's **Upload** panel (jpg/png/webp,
+your AI art tool, then upload the result from Library's **Upload** panel (jpg/png/webp,
 ≤15 MB) and pick it as this verse's background from Studio's **Media** panel.
 
 ## Setup

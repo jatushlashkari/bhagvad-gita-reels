@@ -5,6 +5,7 @@ import { PageHeader } from '../components/shell/PageHeader.tsx';
 import { ChannelCard } from '../components/settings/ChannelCard.tsx';
 import { ScheduleCard } from '../components/settings/ScheduleCard.tsx';
 import { StyleCard } from '../components/settings/StyleCard.tsx';
+import { ConnectionsCard } from '../components/settings/ConnectionsCard.tsx';
 
 export default function SettingsPage() {
   const [config, setConfig] = useState<ConfigView | null>(null);
@@ -37,13 +38,18 @@ export default function SettingsPage() {
       <PageHeader title="Settings" description="Everything the reels and the automation read." />
       {error && <p className="mb-4 text-sm text-danger">{error}</p>}
       {!config && !error && <p className="text-sm text-muted">loading…</p>}
-      {config && (
-        <div className="space-y-6">
-          <ChannelCard config={config} chapters={chapters} onSaved={setConfig} />
-          <ScheduleCard config={config} onSaved={setConfig} />
-          <StyleCard handle={config.handle} tracks={tracks} />
-        </div>
-      )}
+      <div className="space-y-6">
+        {config && (
+          <>
+            <ChannelCard config={config} chapters={chapters} onSaved={setConfig} />
+            <ScheduleCard config={config} onSaved={setConfig} />
+            <StyleCard handle={config.handle} tracks={tracks} />
+          </>
+        )}
+        {/* Read-only and independent of /api/config — must render even when the config
+            fetch above fails or is still loading (first-time setup, a broken config.json). */}
+        <ConnectionsCard />
+      </div>
     </>
   );
 }
