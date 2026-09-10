@@ -2,7 +2,6 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { computeCinemaTimeline, computeTimeline } from '../../../pipeline/timeline.ts';
 import {
   CUSTOM_REF_PREFIX,
   REF_PATTERN,
@@ -15,8 +14,10 @@ import { DEFAULT_STYLE, type ReelStyle } from '../../../shared/reel-style.ts';
 import type { ReelProps, Verse } from '../../../shared/types.ts';
 import { AddToCalendar } from '../components/calendar/AddToCalendar.tsx';
 import { PageHeader } from '../components/shell/PageHeader.tsx';
+import { ROTATION_NOTE } from '../components/settings/StyleFields.tsx';
 import { BeatsEditor, beatsProblem } from '../components/studio/BeatsEditor.tsx';
-import { MediaControls, ROTATION_NOTE, type Asset } from '../components/studio/MediaControls.tsx';
+import { MediaControls, type Asset } from '../components/studio/MediaControls.tsx';
+import { buildCinemaPreviewProps } from '../components/studio/preview-props.ts';
 import { StyleControls } from '../components/studio/StyleControls.tsx';
 import { Field, buttonClass, headingClass, panelClass, selectClass } from '../components/ui.tsx';
 
@@ -85,9 +86,9 @@ export default function StudioPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [background, setBackground] = useState(''); // file name; '' = Auto rotation
 
-  const [savingStyle, setSavingStyle] = useState(false);
+  // The channel's saved look, fetched once below — the baseline Studio's edits are compared
+  // against for the "modified" badge, and what Reset to channel style restores.
   const [savedStyle, setSavedStyle] = useState<ReelStyle | null>(null);
-  const [styleError, setStyleError] = useState<string | null>(null);
   const [savingBeats, setSavingBeats] = useState(false);
   const [beatsStatus, setBeatsStatus] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -127,7 +128,10 @@ export default function StudioPage() {
       .catch(() => {});
     fetch('/api/style')
       .then((r) => r.json())
-      .then(setStyle)
+      .then((s: ReelStyle) => {
+        setStyle(s);
+        setSavedStyle(s);
+      })
       .catch(() => {});
     loadAssets();
     loadCustomQuotes();
@@ -213,7 +217,6 @@ export default function StudioPage() {
   }, [source, quote]);
 
   const patchStyle = useCallback((patch: Partial<ReelStyle>) => {
-    setSavedStyle(null);
     setStyle((s) => ({ ...s, ...patch }));
   }, []);
 
@@ -236,10 +239,12 @@ export default function StudioPage() {
     () => assets.find((a) => a.file === background)?.rel ?? null,
     [assets, background],
   );
+  const tracks = useMemo(() => assets.filter((a) => a.kind === 'music'), [assets]);
 
   // computeCinemaTimeline throws on an empty beat list (and on a >59.5s reel); computeTimeline can
   // throw the same way for a very long translation. Either one has to surface as text next to the
-  // controls — a throw inside the render tree would tear the Player down instead.
+  // controls — a throw inside the render tree would tear the Player down instead. Both live inside
+  // buildCinemaPreviewProps now, so this memo only handles the Studio-specific source reconciliation.
   const preview = useMemo<{ props: ReelProps | null; totalSec: number; error: string | null }>(() => {
     const custom = source.kind === 'custom' ? quote : null;
     // `verse` is one paint behind `source` right after a switch. Painting a quote's placeholder
@@ -249,39 +254,21 @@ export default function StudioPage() {
       return { props: null, totalSec: 0, error: null };
     }
     if (source.kind === 'custom' && !custom) return { props: null, totalSec: 0, error: null };
-    try {
-      const timings = computeCinemaTimeline(liveBeats, style);
-      const props: ReelProps = {
-        verse,
-        // Unused by CinemaReel, required by the shared ReelProps — built exactly as
-        // pipeline/run.ts builds it, so a translation that would break the render breaks here too.
-        timings: computeTimeline({ introDurSec: 3, meaningDurSec: 10, englishText: verse.english }),
-        format: 'cinema',
-        // Kicker and closing card exactly as pipeline/run.ts builds them for the same ref: a
-        // custom quote signs off with its attribution and has no romanised reference row.
-        cinema: {
-          kicker: custom ? custom.kicker : `GITA ${verse.chapter}.${verse.verse}`,
-          beats: liveBeats,
-          timings,
-          ...(custom ? { closing: { line: custom.attribution, reference: '' } } : {}),
-        },
-        style,
-        audio: { introFile: null, meaningFile: null },
-        media: {
-          background: backgroundRel ? `/api/media/public/${backgroundRel}` : null,
-          // Rotation resolves per verse inside the pipeline, so there is no single track to
-          // preview — it plays silent, and MediaControls says so.
-          music:
-            style.musicMode === 'track' && style.musicFile
-              ? `/api/media/public/assets/music/${style.musicFile}`
-              : null,
-        },
-        brand: { handle },
-      };
-      return { props, totalSec: timings.totalSec, error: null };
-    } catch (e) {
-      return { props: null, totalSec: 0, error: e instanceof Error ? e.message : String(e) };
-    }
+    // Rotation resolves per verse inside the pipeline, so there is no single track to preview —
+    // it plays silent, and StyleFields' note says so.
+    const musicRel = style.musicMode === 'track' && style.musicFile ? `assets/music/${style.musicFile}` : null;
+    return buildCinemaPreviewProps({
+      verse,
+      beats: liveBeats,
+      style,
+      handle,
+      backgroundRel,
+      musicRel,
+      // Kicker and closing card exactly as pipeline/run.ts builds them for the same ref: a
+      // custom quote signs off with its attribution and has no romanised reference row.
+      kicker: custom ? custom.kicker : undefined,
+      closing: custom ? { line: custom.attribution, reference: '' } : undefined,
+    });
   }, [verse, liveBeats, style, backgroundRel, handle, source, quote]);
 
   // Composed here rather than read from /api/quotes so the *unsaved* prefix in the Look panel
@@ -290,32 +277,6 @@ export default function StudioPage() {
     () => promptFor(verse?.chapter ?? 0, liveBeats[0] ?? '', curatedPrompt, style.promptPrefix),
     [verse, liveBeats, curatedPrompt, style.promptPrefix],
   );
-
-  async function saveStyle() {
-    setSavingStyle(true);
-    setStyleError(null);
-    setSavedStyle(null);
-    try {
-      const res = await fetch('/api/style', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(style),
-      });
-      if (!res.ok) {
-        setStyleError(`HTTP ${res.status}: ${await errorDetail(res)}`);
-        return;
-      }
-      const written = (await res.json()) as ReelStyle;
-      setSavedStyle(written);
-      // The server clamps/defaults; adopting what it wrote keeps the form, the preview and
-      // styles/cinema.json from drifting apart.
-      setStyle(written);
-    } catch (e) {
-      setStyleError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSavingStyle(false);
-    }
-  }
 
   async function saveBeats() {
     setSavingBeats(true);
@@ -535,19 +496,16 @@ export default function StudioPage() {
             />
             <StyleControls
               style={style}
+              savedStyle={savedStyle}
+              tracks={tracks}
               onChange={patchStyle}
-              onSave={saveStyle}
-              saving={savingStyle}
-              saved={savedStyle}
-              error={styleError}
+              onReset={() => savedStyle && setStyle(savedStyle)}
             />
             <MediaControls
               assets={assets}
               background={background}
               onBackground={setBackground}
-              style={style}
               prompt={prompt}
-              onChange={patchStyle}
               onAssetsChanged={loadAssets}
             />
 

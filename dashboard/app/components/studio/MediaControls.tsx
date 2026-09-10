@@ -1,36 +1,23 @@
 'use client';
 import { useRef, useState } from 'react';
-import type { ReelStyle } from '../../../../shared/reel-style.ts';
 import { Field, ghostButtonClass, headingClass, labelClass, panelClass, selectClass } from '../ui.tsx';
 
 export type Asset = { file: string; rel: string; kind: 'clip' | 'image' | 'music'; license: string };
-
-export const ROTATION_NOTE = 'preview plays silent; the daily render picks a track per verse';
-
-const MUSIC_MODES: { value: ReelStyle['musicMode']; label: string }[] = [
-  { value: 'silent', label: 'Silent' },
-  { value: 'track', label: 'This track' },
-  { value: 'rotation', label: 'Rotation' },
-];
 
 export function MediaControls({
   assets,
   background,
   onBackground,
-  style,
   prompt,
-  onChange,
   onAssetsChanged,
 }: {
   assets: Asset[];
   /** Selected background *file name* (what POST /api/generate takes), '' = Auto rotation. */
   background: string;
   onBackground: (file: string) => void;
-  style: ReelStyle;
   /** The image prompt for the current source, composed by the page so the *unsaved* prefix
    *  shows here immediately — there is nothing to save, it is copy-out only. */
   prompt: string;
-  onChange: (patch: Partial<ReelStyle>) => void;
   onAssetsChanged: () => void;
 }) {
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -43,7 +30,6 @@ export function MediaControls({
   const images = assets.filter((a) => a.kind === 'image');
   const clips = assets.filter((a) => a.kind === 'clip');
   const backgrounds = [...images, ...clips];
-  const tracks = assets.filter((a) => a.kind === 'music');
 
   async function upload(file: File) {
     setUploading(true);
@@ -58,11 +44,6 @@ export function MediaControls({
         return;
       }
       onAssetsChanged();
-      // Select what was just uploaded — uploading a track and then having to find it in the
-      // dropdown is the kind of half-step that makes a control room feel like a form. Gated on
-      // the saved asset's own `kind`, so a non-mp3 slipped past the accept filter can never end
-      // up nominated as the music track.
-      if (payload?.kind === 'music' && payload.file) onChange({ musicMode: 'track', musicFile: payload.file });
     } catch (e) {
       setUploadError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -152,41 +133,7 @@ export function MediaControls({
         {copied === null ? 'Copy' : copied ? 'Copied' : 'Copy failed'}
       </button>
 
-      <p className="mt-5 text-[10px] uppercase tracking-[0.18em] text-muted">music</p>
-      <div className="mt-2 flex flex-wrap gap-4">
-        {MUSIC_MODES.map((m) => (
-          <label key={m.value} className="flex items-center gap-2 text-sm text-fg">
-            <input
-              type="radio"
-              name="music-mode"
-              aria-label={`music ${m.value}`}
-              className="size-4 accent-accent"
-              checked={style.musicMode === m.value}
-              onChange={() => onChange({ musicMode: m.value })}
-            />
-            {m.label}
-          </label>
-        ))}
-      </div>
-
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <Field label="track">
-          <select
-            aria-label="track"
-            className={selectClass}
-            disabled={style.musicMode !== 'track'}
-            value={style.musicFile ?? ''}
-            onChange={(e) => onChange({ musicFile: e.target.value || null })}
-          >
-            <option value="">— none —</option>
-            {tracks.map((t) => (
-              <option key={t.file} value={t.file}>
-                {t.file}
-              </option>
-            ))}
-          </select>
-        </Field>
-
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <Field label="add track" hint="mp3 ≤20 MB">
           <input
             ref={fileRef}
@@ -205,10 +152,6 @@ export function MediaControls({
 
       {uploading && <p className="mt-2 text-xs text-muted">uploading…</p>}
       {uploadError && <p className="mt-2 text-sm text-danger">{uploadError}</p>}
-      {style.musicMode === 'rotation' && <p className="mt-3 text-xs text-accent-text/70">{ROTATION_NOTE}</p>}
-      {style.musicMode === 'track' && tracks.length === 0 && (
-        <p className="mt-3 text-xs text-muted">no tracks in the pool yet — add an mp3 above</p>
-      )}
     </section>
   );
 }

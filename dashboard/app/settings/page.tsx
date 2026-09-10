@@ -4,10 +4,12 @@ import type { ConfigView } from '../../../shared/config.ts';
 import { PageHeader } from '../components/shell/PageHeader.tsx';
 import { ChannelCard } from '../components/settings/ChannelCard.tsx';
 import { ScheduleCard } from '../components/settings/ScheduleCard.tsx';
+import { StyleCard } from '../components/settings/StyleCard.tsx';
 
 export default function SettingsPage() {
   const [config, setConfig] = useState<ConfigView | null>(null);
   const [chapters, setChapters] = useState<number[]>([]);
+  const [tracks, setTracks] = useState<{ file: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -23,6 +25,10 @@ export default function SettingsPage() {
       .then((r) => r.json())
       .then((s: { chapters: number[] }) => setChapters(s.chapters))
       .catch(() => {});
+    fetch('/api/assets')
+      .then((r) => r.json())
+      .then((all: { file: string; kind: string }[]) => setTracks(all.filter((a) => a.kind === 'music')))
+      .catch(() => {});
   }, []);
   useEffect(load, [load]);
 
@@ -35,6 +41,7 @@ export default function SettingsPage() {
         <div className="space-y-6">
           <ChannelCard config={config} chapters={chapters} onSaved={setConfig} />
           <ScheduleCard config={config} onSaved={setConfig} />
+          <StyleCard handle={config.handle} tracks={tracks} />
         </div>
       )}
     </>
