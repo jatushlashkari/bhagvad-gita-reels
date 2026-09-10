@@ -7,6 +7,7 @@ export const NAV: NavItem[] = [
   { href: '/quotes', label: 'Quotes', icon: 'quotes' },
   { href: '/calendar', label: 'Calendar', icon: 'calendar' },
   { href: '/library', label: 'Library', icon: 'library' },
+  { href: '/settings', label: 'Settings', icon: 'settings' },
 ];
 
 /** '/' is active only on itself; every other tab also owns its sub-paths, and the

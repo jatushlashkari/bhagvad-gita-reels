@@ -3,7 +3,7 @@ import { NAV, isActive } from '../dashboard/app/components/shell/nav.ts';
 
 describe('sidebar navigation', () => {
   it('lists the pages in order, each href unique', () => {
-    expect(NAV.map((i) => i.href)).toEqual(['/', '/studio', '/quotes', '/calendar', '/library']);
+    expect(NAV.map((i) => i.href)).toEqual(['/', '/studio', '/quotes', '/calendar', '/library', '/settings']);
     expect(new Set(NAV.map((i) => i.href)).size).toBe(NAV.length);
     expect(NAV.every((i) => i.label.length > 0)).toBe(true);
   });

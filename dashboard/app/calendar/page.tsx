@@ -126,6 +126,9 @@ export default function CalendarPage() {
                   {view.mode} mode
                 </span>
                 <span className="tabular-nums">{view.items.length} in schedule.json</span>
+                <Link href="/settings" className="text-accent-text hover:underline">
+                  edit schedule
+                </Link>
               </span>
             )}
           </div>
