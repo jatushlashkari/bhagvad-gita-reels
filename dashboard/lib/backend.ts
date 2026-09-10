@@ -1,8 +1,10 @@
 import { localBackend } from './local-backend.ts';
 import type { CustomQuote } from '../../shared/custom-quotes.ts';
+import type { ConfigView } from '../../shared/config.ts';
 import type { ReelStyle } from '../../shared/reel-style.ts';
 import type { Platform, ScheduleConfig, ScheduleItem } from '../../shared/schedule.ts';
 import type { Verse } from '../../shared/types.ts';
+import type { WorkflowState } from './connections-parse.ts';
 
 export type AssetInfo = { file: string; rel: string; kind: 'clip' | 'image' | 'music'; license: string };
 export type StateSummary = {
@@ -33,6 +35,18 @@ export type CalendarView = {
  *  omission — hence `string | null` rather than an optional-only field. */
 export type PostPatch = { at?: string | null; caption?: string; title?: string; status?: 'scheduled' | 'skipped' };
 
+export type { WorkflowState };
+/** getConnections()'s answer: which platform secrets exist where, and the two scheduled
+ *  workflows' enabled state. `actions` is `null` until a real `gh` call answers for it — a
+ *  missing/unauthenticated `gh` (or no remote) must read as "we don't know", never a guessed
+ *  false — and `secrets` names the env keys the platform needs so a card can say exactly what's
+ *  missing without the dashboard ever holding (or exposing) a credential value. */
+export type ConnectionsView = {
+  ghAvailable: boolean;
+  platforms: Record<Platform, { local: boolean; actions: boolean | null; secrets: string[] }>;
+  workflows: Record<'daily-reel' | 'publisher', WorkflowState>;
+};
+
 export interface Backend {
   repoRoot(): string;
   listAssets(): Promise<AssetInfo[]>;
@@ -46,6 +60,22 @@ export interface Backend {
    *  the Studio preview needs the whole thing for ReelProps.verse; existing callers that only
    *  read a subset (e.g. GeneratePanel's `.hindi`) keep working unchanged. */
   getVerse(ref: string): Promise<Verse | null>;
+  /** config.json's daily-pipeline settings (handle, startRef, platforms, format, mode, schedule),
+   *  each field defaulted the same way the pipeline/publisher already default a missing or
+   *  unrecognised value. Throws only when config.json itself isn't valid JSON — a malformed
+   *  *value* inside it never throws here, since this is a read, not a validator. */
+  getConfig(): Promise<ConfigView>;
+  /** Validates `patch` (shared/config.ts's validateConfigPatch — verse existence checked against
+   *  sources/gita.json) then rewrites config.json with the validated fields merged onto the
+   *  parsed file, so keys this panel doesn't know about survive. Throws ConfigValidationError
+   *  (→ 400, carrying the same field-keyed `errors`) on a rule violation, and 'publisher running'
+   *  (→ 409) while the render lock is held — a run in flight is mid-read of this same file. */
+  updateConfig(patch: unknown): Promise<ConfigView>;
+  /** Read-only: which platform secrets exist on this machine (.env) and, when `gh` is reachable,
+   *  in the repo's GitHub Actions, plus the daily-reel/publisher workflows' enabled state. Never
+   *  throws — a missing/unauthenticated `gh` (or no remote) just reports `ghAvailable: false` and
+   *  leaves `actions`/`workflows` at their unknown defaults; the local `.env` status still stands. */
+  getConnections(): Promise<ConnectionsView>;
   /** styles/cinema.json if present (validated/clamped), else DEFAULT_STYLE — never throws. */
   getStyle(): Promise<ReelStyle>;
   /** validateStyle(s) → write styles/cinema.json (2-space + trailing newline) → return the
@@ -130,9 +160,10 @@ export interface Backend {
 }
 
 // Thrown by saveImage/saveAudio when the uploaded bytes are invalid (image doesn't decode / audio
-// too large); re-exported here so routes only ever need to import from this seam, never reach
-// into local-backend.ts.
-export { InvalidImageError, InvalidAudioError } from './local-backend.ts';
+// too large), and by updateConfig when a patch fails validation (ConfigValidationError, carrying
+// the field-keyed `errors` map); re-exported here so routes only ever need to import from this
+// seam, never reach into local-backend.ts.
+export { InvalidImageError, InvalidAudioError, ConfigValidationError } from './local-backend.ts';
 
 export function getBackend(): Backend {
   return localBackend;

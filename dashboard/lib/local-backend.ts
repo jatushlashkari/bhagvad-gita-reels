@@ -32,12 +32,14 @@ import {
   type PostStatus,
   type ScheduleItem,
 } from '../../shared/schedule.ts';
+import { DAILY_PLATFORMS, FORMATS, MODES, validateConfigPatch, type ConfigView } from '../../shared/config.ts';
 import { pickNext, readState, verseOrder, type PlatformKey } from '../../pipeline/select.ts';
 import { loadStylePreset } from '../../pipeline/run.ts';
 import { loadDotenv, readSchedule, secretsFor, writeSchedule } from '../../pipeline/schedule-io.ts';
 import type { Manifest } from '../../scripts/fetch-assets.ts';
 import type { Verse } from '../../shared/types.ts';
-import type { AssetInfo, Backend, CalendarView, MediaHandle, PostPatch, QuoteRow, StateSummary } from './backend.ts';
+import { parseSecretNames, parseWorkflowStates } from './connections-parse.ts';
+import type { AssetInfo, Backend, CalendarView, ConnectionsView, MediaHandle, PostPatch, QuoteRow, StateSummary } from './backend.ts';
 
 export const REPO_ROOT = resolve(process.cwd(), '..');
 
@@ -229,6 +231,89 @@ async function getState(): Promise<StateSummary> {
 async function getVerse(ref: string): Promise<Verse | null> {
   const sources = JSON.parse(await readFile(join(REPO_ROOT, 'sources/gita.json'), 'utf8')) as { verses: Verse[] };
   return sources.verses.find((v) => v.ref === ref) ?? null;
+}
+
+const CONFIG_PATH = () => join(REPO_ROOT, 'config.json');
+
+/** Thrown by updateConfig when the patch breaks a rule; carries the same field-keyed
+ *  map the form renders, so the route can answer it verbatim as a 400. */
+export class ConfigValidationError extends Error {
+  constructor(public errors: Record<string, string>) {
+    super(Object.entries(errors).map(([k, v]) => `${k}: ${v}`).join('; '));
+  }
+}
+
+async function getConfig(): Promise<ConfigView> {
+  const raw = JSON.parse(await readFile(CONFIG_PATH(), 'utf8')) as Record<string, unknown>;
+  const platforms = Array.isArray(raw.platforms) ? raw.platforms : [];
+  return {
+    handle: typeof raw.handle === 'string' ? raw.handle : '',
+    startRef: typeof raw.startRef === 'string' ? raw.startRef : 'gita:1:1',
+    platforms: DAILY_PLATFORMS.filter((p) => platforms.includes(p)),
+    format: (FORMATS as readonly unknown[]).includes(raw.format) ? (raw.format as ConfigView['format']) : 'classic',
+    // A missing mode means the legacy daily pipeline — the same default the publisher uses.
+    mode: (MODES as readonly unknown[]).includes(raw.mode) ? (raw.mode as ConfigView['mode']) : 'daily',
+    schedule: validateScheduleConfig(raw.schedule),
+  };
+}
+
+// Routed through the same `queue` as every other shared-file writer: config.json is read by
+// getState/getCalendar too, and a write racing one of those reads (or another config write) could
+// tear a reader's JSON.parse or drop one writer's fields — the same read-modify-write hazard as
+// saveStyle/saveBeats above.
+function updateConfig(patch: unknown): Promise<ConfigView> {
+  const result = queue.then(() => updateConfigExclusive(patch));
+  queue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
+async function updateConfigExclusive(patch: unknown): Promise<ConfigView> {
+  // config.json is read by every run; refuse while one holds the lock, exactly as
+  // calendar edits do.
+  assertPublisherIdle();
+  const sources = JSON.parse(await readFile(join(REPO_ROOT, 'sources/gita.json'), 'utf8')) as { verses: Verse[] };
+  const checked = validateConfigPatch(patch, { verseRefs: new Set(sources.verses.map((v) => v.ref)) });
+  if (!checked.ok) throw new ConfigValidationError(checked.errors);
+  const raw = JSON.parse(await readFile(CONFIG_PATH(), 'utf8')) as Record<string, unknown>;
+  // Spread over the parsed file, so keys this panel does not know about survive.
+  await writeFile(CONFIG_PATH(), JSON.stringify({ ...raw, ...checked.value }, null, 2) + '\n');
+  return getConfig();
+}
+
+// Read-only: which platform secrets exist locally (.env) and, when `gh` is reachable, in GitHub
+// Actions, plus the two scheduled workflows' enabled state. Never throws — a missing/unauthenticated
+// `gh` just leaves ghAvailable false and the workflow states 'unknown', same as no local secrets.
+async function getConnections(): Promise<ConnectionsView> {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  loadDotenv(join(REPO_ROOT, '.env'), env);
+  const platforms = Object.fromEntries(
+    PLATFORMS.map((p) => {
+      const local = secretsFor(p, env);
+      // secretsFor over an empty env names every key the platform needs. The cast is only for
+      // Next's global.d.ts, which augments NodeJS.ProcessEnv to require NODE_ENV — root tsc has
+      // no such augmentation (pipeline/schedule-io.test.ts calls secretsFor(p, {}) uncast), so
+      // this is a dashboard-typecheck-only wrinkle, not a real environment requirement.
+      const missingFromEmpty = secretsFor(p, {} as NodeJS.ProcessEnv);
+      const secrets = missingFromEmpty.ok ? [] : missingFromEmpty.missing;
+      return [p, { local: local.ok, actions: null as boolean | null, secrets }];
+    }),
+  ) as ConnectionsView['platforms'];
+  let workflows: ConnectionsView['workflows'] = { 'daily-reel': 'unknown', publisher: 'unknown' };
+  let ghAvailable = false;
+  try {
+    const secretList = await execa('gh', ['secret', 'list', '--json', 'name', '-q', '.[].name'], { cwd: REPO_ROOT, timeout: 8000 });
+    const names = parseSecretNames(secretList.stdout);
+    ghAvailable = true;
+    for (const p of PLATFORMS) platforms[p].actions = platforms[p].secrets.every((k) => names.has(k));
+    const list = await execa('gh', ['workflow', 'list', '--all'], { cwd: REPO_ROOT, timeout: 8000 });
+    workflows = parseWorkflowStates(list.stdout, ['daily-reel', 'publisher']) as ConnectionsView['workflows'];
+  } catch {
+    // gh missing, unauthenticated, or no remote — the local .env status above still stands.
+  }
+  return { ghAvailable, platforms, workflows };
 }
 
 const STYLE_PATH = () => join(REPO_ROOT, 'styles/cinema.json');
@@ -432,6 +517,9 @@ function gitOutput(e: unknown): string {
 // from the cloud once its thumbnail and its entry are both pushed. (public/thumbs is tracked via a
 // committed .gitkeep, so this pathspec matches even on a checkout that has never rendered a row —
 // a pathspec matching nothing is a fatal `git add`, which would take the whole sync down.)
+// `config.json` joins it with Settings: the daily pipeline and the hourly publisher both read it,
+// so a handle/schedule edit made here is exactly as "not real yet" as an edited style or beat until
+// it's pushed.
 const SYNC_PATHS = [
   'public/assets/images',
   'public/assets/manifest.json',
@@ -441,6 +529,7 @@ const SYNC_PATHS = [
   'sources/custom-quotes.json',
   'schedule.json',
   'public/thumbs',
+  'config.json',
 ];
 
 async function sync(): Promise<{ ok: boolean; output: string }> {
@@ -458,7 +547,7 @@ async function sync(): Promise<{ ok: boolean; output: string }> {
       // sync.
       const commit = await execa(
         'git',
-        ['commit', '-m', 'chore: sync dashboard edits (backgrounds, style, beats, quotes, calendar)', '--', ...SYNC_PATHS],
+        ['commit', '-m', 'chore: sync dashboard edits (backgrounds, style, beats, quotes, calendar, config)', '--', ...SYNC_PATHS],
         { cwd: REPO_ROOT },
       );
       log.push(commit.stdout, commit.stderr);
@@ -930,6 +1019,9 @@ export const localBackend: Backend = {
   saveAudio,
   getState,
   getVerse,
+  getConfig,
+  updateConfig,
+  getConnections,
   getStyle,
   saveStyle,
   getBeats,
