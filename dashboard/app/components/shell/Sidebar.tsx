@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from './icons.tsx';
 import { NAV, isActive } from './nav.ts';
 import { ThemeToggle } from './ThemeToggle.tsx';
@@ -62,25 +62,49 @@ export function Sidebar() {
   const openerRef = useRef<HTMLButtonElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
 
-  // Escape closes the phone drawer and hands focus back to the button that opened it;
-  // opening moves focus into the drawer so the keyboard lands where the eyes do.
+  // Both close paths — Escape and the backdrop click — land here so they behave
+  // identically: drop the drawer and hand focus back to the button that opened it.
+  const close = useCallback(() => {
+    setOpen(false);
+    openerRef.current?.focus();
+  }, []);
+
+  // Opening moves focus into the drawer so the keyboard lands where the eyes do. While
+  // open, Tab is trapped inside it — a dialog that lets Tab escape into the page behind
+  // it isn't actually modal — wrapping from the last focusable element back to the
+  // first (and Shift+Tab the other way); Escape still closes via `close()` above.
   useEffect(() => {
     if (!open) return;
     drawerRef.current?.querySelector('a')?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setOpen(false);
-        openerRef.current?.focus();
+        close();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const focusable = drawerRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled])');
+      if (!focusable || focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
       }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open]);
+  }, [open, close]);
 
+  // Three states, three labels — a dot that reads "server ok" before the first ping has
+  // even answered would be announcing a health check that hasn't happened yet.
+  const healthLabel = healthy === false ? 'server unreachable' : healthy ? 'server ok' : 'checking the server…';
   const health = (
     <span
-      aria-label={healthy === false ? 'server unreachable' : 'server ok'}
-      title={healthy === false ? 'server unreachable' : 'server ok'}
+      aria-label={healthLabel}
+      title={healthLabel}
       className={`inline-block size-2 rounded-full ${
         healthy === false ? 'bg-danger' : healthy ? 'bg-success' : 'bg-muted'
       }`}
@@ -107,7 +131,7 @@ export function Sidebar() {
 
       {open && (
         <div className="fixed inset-0 z-30 md:hidden">
-          <div className="absolute inset-0 bg-fg/20" onClick={() => setOpen(false)} />
+          <div className="absolute inset-0 bg-fg/20" onClick={close} />
           <div
             ref={drawerRef}
             role="dialog"

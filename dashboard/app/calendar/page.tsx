@@ -105,7 +105,12 @@ export default function CalendarPage() {
 
   return (
     <>
-      <PageHeader title="Calendar" description="What goes out, where, and when." />
+      <PageHeader
+        title="Calendar"
+        description={
+          view ? `What goes out, where, and when — times in ${view.config.timezone}.` : 'What goes out, where, and when.'
+        }
+      />
       <div className="space-y-6">
         <section className={panelClass}>
           <div className="flex flex-wrap items-baseline justify-between gap-3">
