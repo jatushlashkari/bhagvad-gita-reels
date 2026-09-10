@@ -1,3 +1,62 @@
 @import 'tailwindcss';
-:root { color-scheme: dark; }
-body { background: #0d0817; color: #f5efe0; }
+
+/* One palette, two themes. Components never hard-code a colour — every surface,
+   text and accent below is a token, and scripts/dashboard-theme.test.ts fails the
+   build if a raw colour comes back into dashboard/app. Light is the default; the
+   dark values are the panel's original look. */
+:root {
+  color-scheme: light;
+  --bg: #f6f4ef;
+  --surface: #ffffff;
+  --surface-2: #f1ede4;
+  --line: #e6e1d6;
+  --fg: #1d1a16;
+  --muted: #6b655c;
+  --accent: #e8c874;
+  --accent-text: #b8912e;
+  --ink: #1d1a16;
+  --success: #2f7d4f;
+  --warning: #b26a00;
+  --danger: #b3261e;
+  --video: #0d0817;
+}
+
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0d0817;
+  --surface: #161028;
+  --surface-2: #1c1533;
+  --line: rgba(255, 255, 255, 0.08);
+  --fg: #f5efe0;
+  --muted: #a89f8d;
+  --accent: #e8c874;
+  --accent-text: #e8c874;
+  --ink: #0d0817;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --video: #0d0817;
+}
+
+/* `inline` so a utility compiles to var(--bg) rather than the value :root had at
+   build time — that indirection is what makes the data-theme swap work. */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-text: var(--accent-text);
+  --color-ink: var(--ink);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-video: var(--video);
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
