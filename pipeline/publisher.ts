@@ -195,13 +195,18 @@ export async function renderRow(
   };
 }
 
-export async function runAutoFill(args: PublisherArgs, io: Io): Promise<void> {
+/** How many post/render results in this call were failures — never counts a `skipped` result
+ *  (missing secrets), since the spec only wants a real failure to fail the run. */
+export type RunSummary = { failed: number };
+
+export async function runAutoFill(args: PublisherArgs, io: Io): Promise<RunSummary> {
   const { config, cfg } = loadConfig(io);
   const sources = readJson<{ verses: Verse[] }>(at(io, 'sources/gita.json'));
   const state = await readState(at(io, 'state.json'));
   const schedulePath = at(io, 'schedule.json');
   const plan = planAutoFill(args.now, (await readSchedule(schedulePath)).items, verseOrder(sources.verses, config.startRef), state, cfg);
 
+  let failed = 0;
   for (const { ref, date } of args.days === undefined ? plan : plan.slice(0, args.days)) {
     // One bad render (missing background, TTS hiccup) must not cost the whole run:
     // the row is skipped, logged, and picked up again next hour.
@@ -214,8 +219,10 @@ export async function runAutoFill(args: PublisherArgs, io: Io): Promise<void> {
       io.log(`✔ scheduled ${item.id} (${ref}) for ${date}`);
     } catch (e) {
       io.log(`✖ auto-fill ${ref}: ${(e as Error).message}`);
+      failed++;
     }
   }
+  return { failed };
 }
 
 // secretsFor gated the call already; this is belt-and-braces and never prints the value.
@@ -250,7 +257,11 @@ async function callPlatform(item: ScheduleItem, platform: Platform, post: PostRe
   }
 }
 
-async function publishAndRecord(itemId: string, platform: Platform, args: PublisherArgs, io: Io): Promise<void> {
+/** Publishes (or records the dry-run intent for) one platform of one row, and reports whether
+ *  the attempt was a real failure — a platform call that threw, or an empty asset url — so the
+ *  caller can fail the run. A `skipped` result (missing secrets) is not a failure; neither is a
+ *  row vanishing out from under a stale id (nothing was attempted). */
+async function publishAndRecord(itemId: string, platform: Platform, args: PublisherArgs, io: Io): Promise<boolean> {
   const schedulePath = at(io, 'schedule.json');
   const now = args.now.toISOString();
 
@@ -258,13 +269,13 @@ async function publishAndRecord(itemId: string, platform: Platform, args: Publis
   // bookkeeping, which is a real state change the calendar would keep.
   if (args.dryRun) {
     io.log(`↻ would publish ${itemId} ${platform}`);
-    return;
+    return false;
   }
 
   const item = (await readSchedule(schedulePath)).items.find((i) => i.id === itemId);
   if (!item) {
     io.log(`✖ ${itemId} ${platform}: row no longer exists`);
-    return;
+    return false;
   }
 
   const secrets = secretsFor(platform, io.env);
@@ -289,38 +300,50 @@ async function publishAndRecord(itemId: string, platform: Platform, args: Publis
   const fresh = file.items.find((i) => i.id === itemId);
   if (!fresh) {
     io.log(`✖ ${itemId} ${platform}: row no longer exists`);
-    return;
+    return false;
   }
   fresh.posts[platform] = applyPublishResult(fresh.posts[platform], result, now);
   await writeSchedule(schedulePath, file);
 
   if ('skipped' in result) {
     io.log(`↷ skipped ${itemId} ${platform}: ${result.skipped}`);
+    return false;
   } else if (result.ok) {
     const statePath = at(io, 'state.json');
     await writeState(statePath, recordPost(await readState(statePath), fresh.ref, platform, result.id, now));
     io.log(`✔ ${itemId} ${platform} ${result.id}`);
+    return false;
   } else {
     io.log(`✖ ${itemId} ${platform}: ${result.error}`);
+    return true;
   }
 }
 
-export async function runPublishDue(args: PublisherArgs, io: Io): Promise<void> {
+export async function runPublishDue(args: PublisherArgs, io: Io): Promise<RunSummary> {
   // What is due is decided from one snapshot; each result is then applied to a fresh read.
   const file = await readSchedule(at(io, 'schedule.json'));
+  let failed = 0;
   for (const due of duePosts(args.now, file.items)) {
-    await publishAndRecord(due.itemId, due.platform, args, io);
+    if (await publishAndRecord(due.itemId, due.platform, args, io)) failed++;
   }
+  return { failed };
 }
 
 /** "Publish now" for one platform of one row — the dashboard button and the CLI's
- *  --publish-item. Ignores the scheduled time, but never re-posts a published row. */
-export async function runPublishOne(itemId: string, platform: Platform, args: PublisherArgs, io: Io): Promise<void> {
+ *  --publish-item. Ignores the scheduled time, but never re-posts a published row.
+ *
+ *  The returned summary is for symmetry with runAutoFill/runPublishDue; main() does not fold it
+ *  into the process exit code here — the dashboard's stream reads EXIT 0 as "the CLI finished",
+ *  independent of whether the post itself succeeded, since the row's own status already carries
+ *  that outcome (see CalendarTable.tsx). A thrown error (no such row, already published) still
+ *  fails the explicit request as before. */
+export async function runPublishOne(itemId: string, platform: Platform, args: PublisherArgs, io: Io): Promise<RunSummary> {
   const file = await readSchedule(at(io, 'schedule.json'));
   const item = file.items.find((i) => i.id === itemId);
   if (!item) throw new Error(`no calendar item ${itemId}`);
   if (item.posts[platform].status === 'published') throw new Error(`${itemId} ${platform} is already published`);
-  await publishAndRecord(itemId, platform, args, io);
+  const failed = await publishAndRecord(itemId, platform, args, io);
+  return { failed: failed ? 1 : 0 };
 }
 
 // A re-render keeps the row's id and posts, so the date is only needed for parity with a
@@ -330,15 +353,16 @@ function itemDate(item: ScheduleItem, cfg: ScheduleConfig, now: Date): string {
   return slot ? isoToLocal(slot, cfg.timezone).date : localDateOf(now, cfg.timezone);
 }
 
-export async function main(argv: string[]): Promise<void> {
+export async function main(argv: string[], io: Io = defaultIo(process.cwd())): Promise<void> {
   loadDotenv('.env', process.env);
   const args = parsePublisherArgs(argv);
-  const io = defaultIo(process.cwd());
   const schedulePath = at(io, 'schedule.json');
   let requestFailed = false;
+  let runFailed = 0;
 
-  // Only what the operator asked for by name decides the exit code; the hourly work
-  // records its own failures in the files so the workflow's commit step still runs.
+  // A named request (--add/--rerender/--publish-item) fails the run only when it throws — the
+  // existing contract the dashboard's streaming UI relies on (EXIT 0 means "the CLI finished",
+  // regardless of whether the post itself succeeded; the row's own status carries that outcome).
   const requested = async (what: string, fn: () => Promise<void>) => {
     try {
       await fn();
@@ -347,6 +371,18 @@ export async function main(argv: string[]): Promise<void> {
       requestFailed = true;
     }
   };
+
+  // The hourly workflow runs bare (no --add/--rerender/--publish-item): that whole job — auto-fill
+  // plus publish-due — only ever runs in calendar mode. Explicit, by-name requests (the dashboard)
+  // still work in any mode.
+  if (!args.add && !args.rerender && !args.publishItem) {
+    const { config } = loadConfig(io);
+    const mode = config.mode ?? 'daily';
+    if (mode !== 'calendar') {
+      io.log(`config.json mode is "${mode}" — the calendar publisher only runs in calendar mode`);
+      return;
+    }
+  }
 
   if (args.add) {
     const add = args.add;
@@ -383,21 +419,26 @@ export async function main(argv: string[]): Promise<void> {
 
   if (args.publishItem) {
     const { id, platform } = args.publishItem;
-    await requested(`publish ${id} ${platform}`, () => runPublishOne(id, platform, args, io));
+    // The returned summary is deliberately discarded — see runPublishOne's own comment.
+    await requested(`publish ${id} ${platform}`, async () => { await runPublishOne(id, platform, args, io); });
   }
 
   // Auto-fill runs first but must never block publishing — a render outage cannot be
   // allowed to hold back reels that are already archived and due.
   if (args.autoFill) {
     try {
-      await runAutoFill(args, io);
+      runFailed += (await runAutoFill(args, io)).failed;
     } catch (e) {
       io.log(`✖ auto-fill: ${(e as Error).message}`);
     }
   }
-  if (args.publishDue) await runPublishDue(args, io);
+  if (args.publishDue) runFailed += (await runPublishDue(args, io)).failed;
 
-  if (requestFailed) process.exitCode = 1;
+  // A failed named request, or any real post/render failure this run recorded, turns the job
+  // red — that failure notification (spec §3) is the only email an unattended cron gets. The
+  // files are already written by this point, and the workflow's commit step runs regardless
+  // (`if: always()`), so a red run never costs the record of what happened.
+  if (requestFailed || runFailed > 0) process.exitCode = 1;
 }
 
 if (process.argv[1]?.endsWith('publisher.ts')) {

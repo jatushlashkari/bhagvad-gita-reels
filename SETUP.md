@@ -115,11 +115,15 @@ it works") — there is nothing to dispatch on it here.
    `FB_PAGE_ACCESS_TOKEN`, `YT_CLIENT_ID`, `YT_CLIENT_SECRET`, `YT_REFRESH_TOKEN` — seven in total.
    (`publisher.yml`'s `GH_TOKEN` needs no secret of its own; the workflow gets it for free as
    `github.token`.)
-3. Enable the workflow — it ships disabled like `daily-reel`: `gh workflow enable publisher`.
+3. `gh workflow list --all` — if `publisher` already shows `active` before your secrets are set,
+   run `gh workflow disable publisher` first. Then enable it — it ships disabled like
+   `daily-reel`: `gh workflow enable publisher`.
 4. Dispatch a dry run first, to watch rows appear without posting anything: Actions tab →
    **publisher** → *Run workflow* → check `dry_run` → Run. When it finishes, `/calendar` (or
    `schedule.json`) should show `config.schedule.daysAhead` rows, each with a thumbnail and
-   prefilled captions, every post still `scheduled` — none `published`.
+   prefilled captions, every post still `scheduled` — none `published`. `dry_run` only skips
+   posting — the auto-filled rows are still archived as real GitHub Releases (by design: the
+   rows must be publishable later).
 5. Let it run from here — do nothing. `publisher.yml`'s cron checks every hour; as each post's own
    scheduled time arrives, that hour's run publishes it, marks it `failed` with whatever the
    platform's own API returned (a bad or expired credential shows up as that platform's error, not
@@ -128,6 +132,10 @@ it works") — there is nothing to dispatch on it here.
 6. Verify the first row across all three platforms: YouTube Studio shows the Short (public, or
    private if pre-audit — see §4 above), the reel is live on Instagram and on the Facebook Page,
    a release for that row's ref exists with the MP4, and `state.json` records the platform IDs.
+
+Once it's live, the cloud publisher commits `schedule.json`, `state.json` and `public/thumbs/` to
+`main` every hour on its own — run `git pull` before editing the calendar locally, and if the
+dashboard's Sync is rejected as non-fast-forward, pull first and retry.
 
 **Success gate:** 7 consecutive days, all three platforms, with no manual intervention beyond what
 "When something fails" below describes.

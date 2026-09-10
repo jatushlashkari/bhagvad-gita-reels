@@ -49,8 +49,8 @@ on-demand `workflow_dispatch`), auto-filling upcoming rows and publishing whatev
   posting times are stored as UTC underneath.
 
 `SCHEDULE_SKIP_RELEASE=1` is a local/test escape hatch — it renders a row without creating a GitHub
-Release, leaving `asset.url` empty. Such a row can never be published (the publisher refuses it),
-which makes it safe to exercise auto-fill without littering the repo's Releases page.
+Release, leaving `asset.url` empty. Such a row will fail with "no asset url" once secrets exist —
+test-only — which makes it safe to exercise auto-fill without littering the repo's Releases page.
 
 A manual run (Actions tab → **publisher** → *Run workflow*) offers a `dry_run` input — the same idea
 as the CLI's `--dry-run`: rows still get rendered and scheduled, nothing gets posted.
@@ -161,6 +161,10 @@ its own scheduled time, status and caption (YouTube also gets its own title).
   `--publish-item` from the CLI.
 - **Sync** (see above) now also commits and pushes `schedule.json` and `public/thumbs/`, so a
   calendar edited here reaches the cloud publisher too.
+- **Staying in sync with the cloud** — once it's live, the hourly publisher commits
+  `schedule.json`, `state.json` and `public/thumbs/` to `main` on its own every hour. Run
+  `git pull` before editing the calendar locally, and if Sync is rejected as non-fast-forward,
+  pull first and retry.
 
 ### Quotes
 

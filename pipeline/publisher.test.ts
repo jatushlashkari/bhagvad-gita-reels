@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { parsePublisherArgs, renderRow, runAutoFill, runPublishDue, runPublishOne, type Io, type PublisherArgs } from './publisher.ts';
+import { main, parsePublisherArgs, renderRow, runAutoFill, runPublishDue, runPublishOne, type Io, type PublisherArgs } from './publisher.ts';
 import type { ScheduleFile, ScheduleItem } from '../shared/schedule.ts';
 import type { StateFile } from './select.ts';
 
@@ -490,5 +490,52 @@ describe('renderRow', () => {
     const refs = readSchedule(root).items.map((i) => i.ref);
     expect(refs).toEqual(['custom:abc', 'gita:1:1', 'gita:1:2']); // the custom row covers 09-10; auto-fill only ever picks source verses
     expect(fake.runs.slice(1).map((r) => r[r.indexOf('--verse') + 1])).toEqual(['gita:1:1', 'gita:1:2']);
+  });
+});
+
+describe('main', () => {
+  const now = new Date('2026-09-12T02:00:00Z'); // past all three 2026-09-12 slots
+
+  afterEach(() => {
+    process.exitCode = 0;
+  });
+
+  it('sets process.exitCode = 1 when a due post genuinely fails during a bare run', async () => {
+    const root = makeRoot();
+    seed(root, [item('gita-1-1-20260912-a1b2', 'gita:1:1', '2026-09-12')]);
+    const fake = fakeIo(root, {
+      env: { IG_USER_ID: 'ig-user', IG_ACCESS_TOKEN: 'ig-token', FB_PAGE_ID: 'fb-page', FB_PAGE_ACCESS_TOKEN: 'fb-token' },
+      postIds: { instagram: 'ig-1', facebook: new Error('fb boom') },
+    });
+
+    await main(['--now', now.toISOString()], fake.io);
+
+    expect(process.exitCode).toBe(1);
+    expect(readSchedule(root).items[0].posts.facebook).toMatchObject({ status: 'failed', error: 'fb boom' });
+  });
+
+  it('leaves process.exitCode at 0 when every due post is only skipped for missing secrets', async () => {
+    const root = makeRoot();
+    seed(root, [item('gita-1-1-20260912-a1b2', 'gita:1:1', '2026-09-12')]);
+    const fake = fakeIo(root, { env: {} }); // no secrets anywhere → nothing to publish with
+
+    await main(['--now', now.toISOString()], fake.io);
+
+    expect(process.exitCode).toBe(0);
+    expect(Object.values(readSchedule(root).items[0].posts).every((p) => p.status === 'skipped')).toBe(true);
+  });
+
+  it('refuses a bare run outright when config.json mode is not "calendar", touching nothing', async () => {
+    const root = makeRoot();
+    writeFileSync(join(root, 'config.json'), JSON.stringify({ ...CONFIG, mode: 'daily' }, null, 2) + '\n');
+    const fake = fakeIo(root);
+
+    await main([], fake.io);
+
+    expect(fake.runs).toEqual([]);
+    expect(fake.posts).toEqual([]);
+    expect(readSchedule(root).items).toEqual([]);
+    expect(fake.logs).toEqual(['config.json mode is "daily" — the calendar publisher only runs in calendar mode']);
+    expect(process.exitCode).toBe(0);
   });
 });
