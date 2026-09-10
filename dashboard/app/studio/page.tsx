@@ -93,6 +93,10 @@ export default function StudioPage() {
   const [log, setLog] = useState('');
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState<null | boolean>(null);
+  // Frozen at the moment a render succeeds (see `render()`), never read live from `ref` — otherwise
+  // changing the verse after a successful render would let "Add to calendar" archive the old
+  // out/reel.mp4 under the newly selected ref instead of the one it was actually rendered from.
+  const [renderedRef, setRenderedRef] = useState<string | null>(null);
   const logRef = useRef<HTMLPreElement>(null);
 
   const loadAssets = useCallback(() => {
@@ -396,7 +400,11 @@ export default function StudioPage() {
         setLog(all);
         logRef.current?.scrollTo(0, 1e9);
       }
-      setDone(/\nEXIT 0\n?$/.test(all));
+      const success = /\nEXIT 0\n?$/.test(all);
+      setDone(success);
+      // `ref` here is the value closed over when this render() call started, not whatever the
+      // picker shows by the time the stream finishes — so this always names the cut on disk.
+      if (success) setRenderedRef(ref);
     } catch (e) {
       appendLog(e instanceof Error ? e.message : String(e));
       setDone(false);
@@ -404,6 +412,16 @@ export default function StudioPage() {
       setRunning(false);
     }
   }
+
+  // A verse/quote change must drop the stale player and Add-to-calendar control, not leave them
+  // pointing at a cut that no longer matches what's selected. Skipped while a render is in
+  // flight: that call's own completion handler above decides `done`/`renderedRef` for the ref it
+  // was actually invoked with, and must not be second-guessed by a selection change mid-stream.
+  useEffect(() => {
+    if (running) return;
+    setDone(null);
+    setRenderedRef(null);
+  }, [ref]);
 
   const verseCount = source.kind === 'verse' ? chapters[source.ch - 1] ?? 1 : 1;
   const problem = beatsProblem(beats);
@@ -564,12 +582,14 @@ export default function StudioPage() {
                 {log || 'starting…'}
               </pre>
             )}
-            {done === true && (
+            {done === true && renderedRef && (
               <>
                 <ReelPlayer />
                 {/* Only after a successful render: "Add to calendar" schedules the cut now sitting
-                    in out/, so offering it before one exists would archive someone else's reel. */}
-                <AddToCalendar sourceRef={ref} />
+                    in out/, so offering it before one exists would archive someone else's reel.
+                    `renderedRef`, not the live `ref` — see its declaration above — so a verse
+                    change right after rendering can't archive the old file under the new ref. */}
+                <AddToCalendar sourceRef={renderedRef} />
               </>
             )}
             {done === false && <p className="mt-3 text-sm text-red-400">failed — log above</p>}

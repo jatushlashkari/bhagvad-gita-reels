@@ -5,6 +5,7 @@ import { REF_PATTERN } from '../../../../shared/custom-quotes.ts';
 import { DEFAULT_SCHEDULE_CONFIG, addDays, localDateOf } from '../../../../shared/schedule.ts';
 import type { CalendarView } from '../../../lib/backend.ts';
 import { ghostButtonClass, labelClass, selectClass } from '../studio/ui.tsx';
+import { BUSY } from './CalendarTable.tsx';
 
 /** Same reader as GeneratePanel's, the Studio's and the Quotes page's: the routes answer
  *  `{ error }` JSON, but an unhandled server fault can still arrive as plain text or HTML — read
@@ -73,7 +74,7 @@ export function AddToCalendar({ sourceRef }: { sourceRef: string }) {
         body: JSON.stringify({ ref: sourceRef, date, format: 'cinema', fromLastRender: true }),
       });
       if (res.status === 409) {
-        setLog('A render or the publisher is already running — try again in a moment.');
+        setLog(BUSY);
         setDone(false);
         return;
       }
