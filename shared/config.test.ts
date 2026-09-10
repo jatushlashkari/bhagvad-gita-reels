@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { DEFAULT_SCHEDULE_CONFIG } from './schedule.ts';
-import { validateConfigPatch } from './config.ts';
+import { mergeConfig, validateConfigPatch } from './config.ts';
 
 const ok = (r: ReturnType<typeof validateConfigPatch>) => {
   if (!r.ok) throw new Error(`expected ok, got ${JSON.stringify(r.errors)}`);
@@ -61,5 +61,26 @@ describe('validateConfigPatch', () => {
   it('collects errors from every field in one pass', () => {
     const e = errs(validateConfigPatch({ handle: 'x', format: 'nope' }));
     expect(Object.keys(e).sort()).toEqual(['format', 'handle']);
+  });
+});
+
+describe('mergeConfig', () => {
+  it('keeps root keys the settings panel knows nothing about', () => {
+    const raw = { handle: '@old', voice: { rate: '+8%' }, notes: ['keep me'] };
+    const merged = mergeConfig(raw, ok(validateConfigPatch({ handle: '@new' })));
+    expect(merged).toEqual({ handle: '@new', voice: { rate: '+8%' }, notes: ['keep me'] });
+  });
+
+  it('overwrites only the keys the patch carries', () => {
+    const raw = { handle: '@old', format: 'classic', mode: 'daily' };
+    expect(mergeConfig(raw, ok(validateConfigPatch({ format: 'cinema' })))).toEqual({
+      handle: '@old', format: 'cinema', mode: 'daily',
+    });
+  });
+
+  it('does not mutate the parsed file it was handed', () => {
+    const raw = { handle: '@old', voice: { rate: '+8%' } };
+    mergeConfig(raw, ok(validateConfigPatch({ handle: '@new' })));
+    expect(raw).toEqual({ handle: '@old', voice: { rate: '+8%' } });
   });
 });

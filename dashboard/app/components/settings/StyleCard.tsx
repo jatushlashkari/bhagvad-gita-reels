@@ -23,10 +23,21 @@ export function StyleCard({ handle, tracks }: { handle: string; tracks: { file: 
   const [beats, setBeats] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
+  // No `dirtyRef` resync guard here, unlike ChannelCard and ScheduleCard: those take a shared
+  // `config` prop that a sibling card's save replaces, which is the stomping the guard exists to
+  // prevent. This card owns its own fetch and takes no such prop, so nothing can replace `style`
+  // out from under an unsaved edit. If a shared style prop is ever threaded in, add the guard.
   useEffect(() => {
-    fetch('/api/style').then((r) => r.json()).then((s: ReelStyle) => { setStyle(s); setSavedStyle(s); }).catch(() => {});
+    fetch('/api/style')
+      // Checked, not swallowed: on a failure the card would otherwise render DEFAULT_STYLE while
+      // `savedStyle` stayed null — so `dirty` is never true, Save is disabled forever, and the
+      // owner is looking at the defaults believing they are their saved channel style.
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`could not load styles/cinema.json (HTTP ${r.status})`))))
+      .then((s: ReelStyle) => { setStyle(s); setSavedStyle(s); })
+      .catch((e: unknown) => setLoadError(e instanceof Error ? e.message : 'could not load the channel style'));
     fetch(`/api/verse/${encodeURIComponent(SAMPLE_REF)}`).then((r) => (r.ok ? r.json() : null)).then(setVerse).catch(() => {});
     fetch(`/api/beats/${encodeURIComponent(SAMPLE_REF)}`)
       .then((r) => (r.ok ? r.json() : null))
@@ -65,6 +76,7 @@ export function StyleCard({ handle, tracks }: { handle: string; tracks: { file: 
 
   return (
     <SettingsCard
+      id="style"
       title="Channel style"
       description="The look every render starts from. Studio can override it for one reel."
       dirty={dirty}
@@ -76,10 +88,16 @@ export function StyleCard({ handle, tracks }: { handle: string; tracks: { file: 
       invalid={false}
       onSave={save}
     >
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(220px,300px)] lg:items-start">
-        <StyleFields style={style} tracks={tracks} onChange={(patch) => setStyle((s) => ({ ...s, ...patch }))} />
-        <PreviewPane inputProps={preview.props} totalSec={preview.totalSec} error={preview.error} note={`sample: ${SAMPLE_REF}`} />
-      </div>
+      {loadError ? (
+        // Fields and preview both stay hidden: they would be rendering DEFAULT_STYLE, and a form
+        // that looks like your saved look but is not it is worse than no form at all.
+        <p className="text-sm text-danger">{loadError} — reload once the server is answering again.</p>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(220px,300px)] lg:items-start">
+          <StyleFields style={style} tracks={tracks} onChange={(patch) => setStyle((s) => ({ ...s, ...patch }))} />
+          <PreviewPane inputProps={preview.props} totalSec={preview.totalSec} error={preview.error} note={`sample: ${SAMPLE_REF}`} />
+        </div>
+      )}
     </SettingsCard>
   );
 }

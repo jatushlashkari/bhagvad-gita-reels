@@ -39,11 +39,18 @@ export type { WorkflowState };
 /** getConnections()'s answer: which platform secrets exist where, and the two scheduled
  *  workflows' enabled state. `actions` is `null` until a real `gh` call answers for it — a
  *  missing/unauthenticated `gh` (or no remote) must read as "we don't know", never a guessed
- *  false — and `secrets` names the env keys the platform needs so a card can say exactly what's
- *  missing without the dashboard ever holding (or exposing) a credential value. */
+ *  false. Names only, never values: the dashboard never holds (or exposes) a credential.
+ *
+ *  The two key lists are NOT interchangeable:
+ *  - `secrets` — every env key the platform needs, whatever this machine happens to have. This
+ *    is the list the GitHub Actions check tests against `gh secret list`; narrowing it would
+ *    make that check pass vacuously (`[].every(...)` is `true`).
+ *  - `missingLocal` — only the keys missing from THIS machine's environment, so the card can
+ *    name the one key you still owe it rather than the platform's whole list. Empty when
+ *    `local` is true. */
 export type ConnectionsView = {
   ghAvailable: boolean;
-  platforms: Record<Platform, { local: boolean; actions: boolean | null; secrets: string[] }>;
+  platforms: Record<Platform, { local: boolean; actions: boolean | null; secrets: string[]; missingLocal: string[] }>;
   workflows: Record<'daily-reel' | 'publisher', WorkflowState>;
 };
 

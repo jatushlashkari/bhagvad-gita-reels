@@ -19,6 +19,10 @@ const REMOTION_PATH = path.join(__dirname, 'node_modules', 'remotion');
 
 const config: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, '..'),
+  // The dev-tools badge defaults to bottom-left, which is exactly where the sidebar pins its
+  // theme toggle — the badge sat on top of the toggle's icon and the first characters of its
+  // label. This panel only ever runs under `next dev`, so moving the badge is the fix.
+  devIndicators: { position: 'bottom-right' },
   turbopack: { resolveAlias: { remotion: REMOTION_REQUEST } },
   webpack(cfg) {
     cfg.resolve.alias = { ...cfg.resolve.alias, remotion$: REMOTION_PATH };

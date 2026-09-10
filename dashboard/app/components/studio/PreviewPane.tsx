@@ -60,7 +60,9 @@ export function PreviewPane({
               // live). Starting paused makes the first click both the play and the gesture that
               // unblocks audio, so a music preview works on the very first play.
               acknowledgeRemotionLicense
-              className="rounded-lg ring-1 ring-line"
+              // bg-video, like the loading skeleton below: video surfaces stay dark in both
+              // themes, and without it the light theme flashes white until the first frame paints.
+              className="rounded-lg bg-video ring-1 ring-line"
               style={{ width: '100%' }}
             />
           </div>

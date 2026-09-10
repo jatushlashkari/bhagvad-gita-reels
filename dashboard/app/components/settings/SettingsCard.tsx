@@ -4,6 +4,7 @@ import { buttonClass, panelClass } from '../ui.tsx';
 /** One card, one Save. Cards are independent on purpose: a bad time in the schedule
  *  must not stop you saving a handle. */
 export function SettingsCard({
+  id,
   title,
   description,
   dirty,
@@ -14,6 +15,9 @@ export function SettingsCard({
   onSave,
   children,
 }: {
+  /** Anchor target, so links elsewhere can point at one card (`/settings#schedule`)
+   *  rather than dropping the reader at the top of the page. */
+  id?: string;
   title: string;
   description?: string;
   dirty: boolean;
@@ -25,7 +29,7 @@ export function SettingsCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className={panelClass}>
+    <section id={id} className={`${panelClass} scroll-mt-6`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-base font-semibold text-fg">{title}</h2>
         {dirty && <span className="text-xs text-warning">unsaved changes</span>}

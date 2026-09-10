@@ -22,7 +22,12 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
   useEffect(() => setTheme(readTheme()), []);
 
   function toggle() {
-    const next: Theme = theme === 'dark' ? 'light' : 'dark';
+    // The document, not this component's state: two copies of this button are mounted at once
+    // (the rail and the phone drawer), each having read the theme only on its own mount. Compute
+    // the next value from `document.documentElement`, which both copies share, or the stale copy
+    // re-applies the theme that is already on and its first click appears to do nothing.
+    const current: Theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+    const next: Theme = current === 'dark' ? 'light' : 'dark';
     setTheme(next);
     if (next === 'dark') document.documentElement.dataset.theme = 'dark';
     else delete document.documentElement.dataset.theme;

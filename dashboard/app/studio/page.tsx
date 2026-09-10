@@ -57,7 +57,7 @@ function ReelPlayer() {
   const [src] = useState(() => `${REEL_URL}?t=${Date.now()}`);
   return (
     <div className="mt-4 flex flex-wrap items-end gap-4">
-      <video controls src={src} className="aspect-[9/16] w-48 rounded-xl ring-1 ring-line" />
+      <video controls src={src} className="aspect-[9/16] w-48 rounded-xl bg-video ring-1 ring-line" />
       <a
         href={src}
         download="reel.mp4"
@@ -89,6 +89,8 @@ export default function StudioPage() {
   // The channel's saved look, fetched once below — the baseline Studio's edits are compared
   // against for the "modified" badge, and what Reset to channel style restores.
   const [savedStyle, setSavedStyle] = useState<ReelStyle | null>(null);
+  const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
   const [savingBeats, setSavingBeats] = useState(false);
   const [beatsStatus, setBeatsStatus] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -218,6 +220,29 @@ export default function StudioPage() {
 
   const patchStyle = useCallback((patch: Partial<ReelStyle>) => {
     setStyle((s) => ({ ...s, ...patch }));
+  }, []);
+
+  // Re-reads styles/cinema.json rather than restoring `savedStyle`, which is a snapshot taken
+  // when this page mounted: save a new channel style in a Settings tab and Reset here would
+  // otherwise bring back the *old* look — and leave the "modified" badge comparing against a
+  // baseline that no longer matches the file.
+  const resetStyle = useCallback(async () => {
+    setResetting(true);
+    setResetError(null);
+    try {
+      const res = await fetch('/api/style');
+      if (!res.ok) {
+        setResetError(`could not reload the channel style (HTTP ${res.status})`);
+        return;
+      }
+      const fresh = (await res.json()) as ReelStyle;
+      setStyle(fresh);
+      setSavedStyle(fresh);
+    } catch (e) {
+      setResetError(e instanceof Error ? e.message : 'could not reload the channel style');
+    } finally {
+      setResetting(false);
+    }
   }, []);
 
   // Remembered so a hop to a custom quote and back returns to the verse you were on rather
@@ -499,7 +524,9 @@ export default function StudioPage() {
               savedStyle={savedStyle}
               tracks={tracks}
               onChange={patchStyle}
-              onReset={() => savedStyle && setStyle(savedStyle)}
+              onReset={() => void resetStyle()}
+              resetting={resetting}
+              resetError={resetError}
             />
             <MediaControls
               assets={assets}

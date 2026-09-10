@@ -110,16 +110,17 @@ fed by the same code the render uses, so what you see is what gets rendered.
   top line and the closing-card handle, text/accent colors, scrim strength, timing, Ken Burns,
   kicker/handle toggles, the beat **transition** — crossfade (the next beat overlaps as this one
   fades out) or sequential (this beat fades fully out, the image holds alone for a **gap**, then
-  the next beat fades in) — with its **fade** and **gap** lengths, and a **prompt prefix** (the
-  art-direction line every image prompt starts with — see Image prompts below). A **modified**
-  badge appears as soon as you diverge from the saved style, and **Reset to channel style**
+  the next beat fades in) — with its **fade** and **gap** lengths, a **prompt prefix** (the
+  art-direction line every image prompt starts with — see Image prompts below), and **music
+  mode**: silent, a specific track, or rotation (rotation previews silent — the pick is
+  deterministic per verse and happens server-side). A **modified** badge appears as soon as you
+  diverge from the saved style, and **Reset to channel style** re-reads `styles/cinema.json` and
   discards the changes. The style itself — the preset in `styles/cinema.json` that every cinema
   render (the scheduled pipeline, daily or calendar, and any other Studio session) starts from,
   and that travels with the dashboard's **Sync** — is edited on **Settings**, not here; a link in
-  this panel jumps straight there.
-- **Media** — pick a background from the pool, and set music mode: silent, a specific track, or
-  rotation (silent in the preview — the daily pick is deterministic per verse and happens
-  server-side). Upload your own mp3 from the same panel.
+  this panel jumps straight to that card.
+- **Media** — pick a background from the pool, copy the composed image prompt, and upload your
+  own mp3 into the music pool (the track itself is then chosen in **Look** above).
 - **Render** in Studio is always a dry run with your current edits layered on as one-off overrides
   — nothing is posted, `state.json` is untouched, and `styles/cinema.json` is never touched from
   here; only Settings' **Channel style** card writes it.

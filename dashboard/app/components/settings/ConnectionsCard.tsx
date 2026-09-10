@@ -39,30 +39,36 @@ export function ConnectionsCard() {
       {error && <p className="mt-3 text-sm text-danger">{error}</p>}
       {view && (
         <>
+          {/* pr-6 on every cell but the last: headingClass widens the letters with
+              tracking-[0.18em], and with no gutter the four labels ran together into one
+              string ("PLATFORM THIS MACHINE (.ENV)"). Body cells match it so a long key
+              list can't butt against the next column either. */}
           <table className="mt-4 w-full text-sm">
             <thead>
               <tr className={headingClass}>
-                <th scope="col" className="py-1 text-left">platform</th>
-                <th scope="col" className="py-1 text-left">this machine (.env)</th>
-                <th scope="col" className="py-1 text-left">GitHub Actions</th>
+                <th scope="col" className="py-1 pr-6 text-left">platform</th>
+                <th scope="col" className="py-1 pr-6 text-left">this machine (.env)</th>
+                <th scope="col" className="py-1 pr-6 text-left">GitHub Actions</th>
                 <th scope="col" className="py-1 text-left">how to set</th>
               </tr>
             </thead>
             <tbody>
               {PLATFORMS.map((p) => (
                 <tr key={p} className="border-t border-line">
-                  <td className="py-2 text-fg">{p}</td>
-                  <td className="py-2 text-muted">
+                  <td className="py-2 pr-6 text-fg">{p}</td>
+                  <td className="py-2 pr-6 text-muted">
                     <Dot on={view.platforms[p].local} />{' '}
                     {view.platforms[p].local ? (
                       'present'
                     ) : (
-                      // Name the missing keys instead of a bare "missing" — never a value, just
-                      // the env var names, so an operator knows exactly what to add to .env.
-                      <span className="font-mono text-[11px]">{view.platforms[p].secrets.join(', ')}</span>
+                      // `missingLocal`, not `secrets`: name the keys this machine is actually
+                      // short of, never the platform's whole list — someone two keys into
+                      // YouTube's three needs to be told about the third. Never a value, just
+                      // the env var names, so they know exactly what to add to .env.
+                      <span className="font-mono text-[11px]">{view.platforms[p].missingLocal.join(', ')}</span>
                     )}
                   </td>
-                  <td className="py-2 text-muted">
+                  <td className="py-2 pr-6 text-muted">
                     <Dot on={view.platforms[p].actions} />{' '}
                     {view.platforms[p].actions === null ? 'unknown' : view.platforms[p].actions ? 'present' : 'missing'}
                   </td>

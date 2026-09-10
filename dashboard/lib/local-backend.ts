@@ -32,13 +32,13 @@ import {
   type PostStatus,
   type ScheduleItem,
 } from '../../shared/schedule.ts';
-import { DAILY_PLATFORMS, FORMATS, MODES, validateConfigPatch, type ConfigView } from '../../shared/config.ts';
+import { DAILY_PLATFORMS, FORMATS, MODES, mergeConfig, validateConfigPatch, type ConfigView } from '../../shared/config.ts';
 import { pickNext, readState, verseOrder, type PlatformKey } from '../../pipeline/select.ts';
 import { loadStylePreset } from '../../pipeline/run.ts';
 import { loadDotenv, readSchedule, secretsFor, writeSchedule } from '../../pipeline/schedule-io.ts';
 import type { Manifest } from '../../scripts/fetch-assets.ts';
 import type { Verse } from '../../shared/types.ts';
-import { parseSecretNames, parseWorkflowStates } from './connections-parse.ts';
+import { parseSecretNames, parseWorkflowStates, platformRow } from './connections-parse.ts';
 import type { AssetInfo, Backend, CalendarView, ConnectionsView, MediaHandle, PostPatch, QuoteRow, StateSummary } from './backend.ts';
 
 export const REPO_ROOT = resolve(process.cwd(), '..');
@@ -278,8 +278,9 @@ async function updateConfigExclusive(patch: unknown): Promise<ConfigView> {
   const checked = validateConfigPatch(patch, { verseRefs: new Set(sources.verses.map((v) => v.ref)) });
   if (!checked.ok) throw new ConfigValidationError(checked.errors);
   const raw = JSON.parse(await readFile(CONFIG_PATH(), 'utf8')) as Record<string, unknown>;
-  // Spread over the parsed file, so keys this panel does not know about survive.
-  await writeFile(CONFIG_PATH(), JSON.stringify({ ...raw, ...checked.value }, null, 2) + '\n');
+  // mergeConfig (shared/config.ts) spreads over the parsed file, so keys this panel does not
+  // know about survive; it is a pure function there so that rule can actually be unit-tested.
+  await writeFile(CONFIG_PATH(), JSON.stringify(mergeConfig(raw, checked.value), null, 2) + '\n');
   return getConfig();
 }
 
@@ -290,16 +291,10 @@ async function getConnections(): Promise<ConnectionsView> {
   const env: NodeJS.ProcessEnv = { ...process.env };
   loadDotenv(join(REPO_ROOT, '.env'), env);
   const platforms = Object.fromEntries(
-    PLATFORMS.map((p) => {
-      const local = secretsFor(p, env);
-      // secretsFor over an empty env names every key the platform needs. The cast is only for
-      // Next's global.d.ts, which augments NodeJS.ProcessEnv to require NODE_ENV — root tsc has
-      // no such augmentation (pipeline/schedule-io.test.ts calls secretsFor(p, {}) uncast), so
-      // this is a dashboard-typecheck-only wrinkle, not a real environment requirement.
-      const missingFromEmpty = secretsFor(p, {} as NodeJS.ProcessEnv);
-      const secrets = missingFromEmpty.ok ? [] : missingFromEmpty.missing;
-      return [p, { local: local.ok, actions: null as boolean | null, secrets }];
-    }),
+    // platformRow (dashboard/lib/connections-parse.ts) is where the full-list/missing-list
+    // distinction lives and is unit-tested; `actions` starts null because only the `gh` call
+    // below can answer it.
+    PLATFORMS.map((p) => [p, { ...platformRow(p, env, secretsFor), actions: null as boolean | null }]),
   ) as ConnectionsView['platforms'];
   let workflows: ConnectionsView['workflows'] = { 'daily-reel': 'unknown', publisher: 'unknown' };
   let ghAvailable = false;

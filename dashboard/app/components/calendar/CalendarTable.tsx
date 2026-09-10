@@ -256,7 +256,7 @@ export function CalendarTable({
                         alt=""
                         loading="lazy"
                         width={40}
-                        className="h-auto w-10 shrink-0 rounded ring-1 ring-line"
+                        className="h-auto w-10 shrink-0 rounded bg-video ring-1 ring-line"
                       />
                       <div className="min-w-0">
                         <p className="text-fg">{item.hook}</p>

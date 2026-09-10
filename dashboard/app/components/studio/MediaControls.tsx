@@ -76,7 +76,7 @@ export function MediaControls({
             aria-pressed={background === ''}
             onClick={() => onBackground('')}
             className={`flex aspect-[9/16] w-full items-center justify-center rounded-lg bg-video text-center text-[10px] leading-tight text-muted ring-1 transition-colors ${
-              background === '' ? 'ring-2 ring-accent' : 'ring-line hover:ring-line'
+              background === '' ? 'ring-2 ring-accent' : 'ring-line hover:ring-accent/50'
             }`}
           >
             Auto
@@ -93,7 +93,7 @@ export function MediaControls({
               onClick={() => onBackground(a.file)}
               title={`${a.file} — ${a.license}`}
               className={`block w-full overflow-hidden rounded-lg ring-1 transition-colors ${
-                background === a.file ? 'ring-2 ring-accent' : 'ring-line hover:ring-line'
+                background === a.file ? 'ring-2 ring-accent' : 'ring-line hover:ring-accent/50'
               }`}
             >
               {a.kind === 'image' ? (
@@ -133,7 +133,9 @@ export function MediaControls({
         {copied === null ? 'Copy' : copied ? 'Copied' : 'Copy failed'}
       </button>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+      {/* Plain block, not a two-column grid: the music mode/track selects moved to the Look
+          panel, so the upload is the only field left and the second column sat empty. */}
+      <div className="mt-5">
         <Field label="add track" hint="mp3 ≤20 MB">
           <input
             ref={fileRef}

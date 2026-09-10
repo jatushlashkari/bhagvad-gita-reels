@@ -7,14 +7,20 @@ import { SettingsCard } from './SettingsCard.tsx';
 import { NumberField, SelectField, TimeField } from './fields.tsx';
 
 /** Intl.supportedValuesOf is in every browser this panel runs in; the fallback keeps
- *  the select usable rather than empty if it ever is not. */
+ *  the select usable rather than empty if it ever is not.
+ *
+ *  The current zone is always first, whether or not the list already contains it: this is a
+ *  native <select> over ~420 entries with no search box of its own (it has the browser's
+ *  type-ahead, which is what ships here), so the zone you are already on should never need
+ *  scrolling for. Filtering it out of the tail keeps the option keys unique. */
 function timezones(current: string): string[] {
+  let all: string[];
   try {
-    const all = (Intl as unknown as { supportedValuesOf: (k: string) => string[] }).supportedValuesOf('timeZone');
-    return all.includes(current) ? all : [current, ...all];
+    all = (Intl as unknown as { supportedValuesOf: (k: string) => string[] }).supportedValuesOf('timeZone');
   } catch {
-    return [current, 'Asia/Kolkata', 'UTC'];
+    all = ['Asia/Kolkata', 'UTC'];
   }
+  return [current, ...all.filter((t) => t !== current)];
 }
 
 export function ScheduleCard({ config, onSaved }: { config: ConfigView; onSaved: (next: ConfigView) => void }) {
@@ -75,6 +81,7 @@ export function ScheduleCard({ config, onSaved }: { config: ConfigView; onSaved:
 
   return (
     <SettingsCard
+      id="schedule"
       title="Publishing schedule"
       description="How far ahead the publisher fills the calendar, and the slot each platform gets."
       dirty={dirty}

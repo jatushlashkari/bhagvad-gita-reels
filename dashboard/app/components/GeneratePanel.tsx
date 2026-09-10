@@ -39,7 +39,7 @@ function ReelPlayer() {
   const [src] = useState(() => `${REEL_URL}?t=${Date.now()}`);
   return (
     <div className="mt-4 flex flex-wrap items-end gap-4">
-      <video controls src={src} className="aspect-[9/16] w-64 rounded-xl ring-1 ring-line" />
+      <video controls src={src} className="aspect-[9/16] w-64 rounded-xl bg-video ring-1 ring-line" />
       <a
         href={src}
         download="reel.mp4"

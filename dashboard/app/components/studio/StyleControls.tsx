@@ -13,12 +13,20 @@ export function StyleControls({
   tracks,
   onChange,
   onReset,
+  resetting = false,
+  resetError = null,
 }: {
   style: ReelStyle;
   savedStyle: ReelStyle | null;
   tracks: { file: string }[];
   onChange: (patch: Partial<ReelStyle>) => void;
+  /** Re-reads styles/cinema.json — Reset restores what is on disk now, not a snapshot
+   *  taken when this page loaded, so a style saved in another tab is what comes back. */
   onReset: () => void;
+  resetting?: boolean;
+  /** Why the re-read failed. Shown rather than swallowed: a Reset that silently does
+   *  nothing looks like a broken button. */
+  resetError?: string | null;
 }) {
   const modified = savedStyle !== null && JSON.stringify(style) !== JSON.stringify(savedStyle);
   return (
@@ -31,12 +39,13 @@ export function StyleControls({
         <StyleFields style={style} tracks={tracks} onChange={onChange} />
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button type="button" className={ghostButtonClass} disabled={!modified} onClick={onReset}>
-          Reset to channel style
+        <button type="button" className={ghostButtonClass} disabled={!modified || resetting} onClick={onReset}>
+          {resetting ? 'Resetting…' : 'Reset to channel style'}
         </button>
-        <Link href="/settings" className="text-xs text-accent-text hover:underline">
+        <Link href="/settings#style" className="text-xs text-accent-text hover:underline">
           Edit the channel style in Settings
         </Link>
+        {resetError && <span className="text-xs text-danger">{resetError}</span>}
       </div>
     </section>
   );

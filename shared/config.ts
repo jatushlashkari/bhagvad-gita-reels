@@ -101,3 +101,13 @@ export function validateConfigPatch(input: unknown, opts: { verseRefs?: Set<stri
 
   return Object.keys(errors).length > 0 ? { ok: false, errors } : { ok: true, value };
 }
+
+/** config.json as parsed from disk + a validated patch -> the object to write back.
+ *  The spread order is the whole point: `raw` first, so a root key this panel never
+ *  learned about (a hand-added `voice` block, say) survives a Settings save instead of
+ *  being dropped by the rewrite. Pure and free of file IO so it can be tested directly —
+ *  the merge used to be one inline expression in the dashboard's backend, which is a
+ *  module the root test suite cannot even import. */
+export function mergeConfig(raw: Record<string, unknown>, patch: ConfigPatch): Record<string, unknown> {
+  return { ...raw, ...patch };
+}
