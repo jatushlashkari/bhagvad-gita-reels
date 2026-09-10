@@ -5,6 +5,7 @@ import { customRef, type CustomQuote } from '../../../shared/custom-quotes.ts';
 import type { QuoteRow } from '../../lib/backend.ts';
 import { CustomQuoteForm, type CustomQuoteDraft } from '../components/quotes/CustomQuoteForm.tsx';
 import { QuotesTable } from '../components/quotes/QuotesTable.tsx';
+import { PageHeader } from '../components/shell/PageHeader.tsx';
 import { ghostButtonClass, headingClass, iconButtonClass, panelClass } from '../components/studio/ui.tsx';
 
 /** Same reader as the Studio's and GeneratePanel's: the routes answer `{ error }` JSON, but an
@@ -151,92 +152,80 @@ export default function QuotesPage() {
   }
 
   return (
-    <main className="mx-auto max-w-7xl space-y-6 px-4 py-8">
-      <header className="flex flex-wrap items-baseline justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-semibold text-[#e8c874]">Quotes</h1>
-          <p className="text-sm text-[#a89f8d]">every verse&rsquo;s beats and image prompt — plus your own quotes</p>
-        </div>
-        <div className="flex gap-4">
-          <Link href="/" className="text-sm text-[#a89f8d] transition-colors hover:text-[#e8c874]">
-            ← Control room
-          </Link>
-          <Link href="/studio" className="text-sm text-[#a89f8d] transition-colors hover:text-[#e8c874]">
-            Studio →
-          </Link>
-        </div>
-      </header>
+    <>
+      <PageHeader title="Quotes" description="Every verse, your favourites, and your own custom quotes." />
+      <div className="space-y-6">
+        <section className={panelClass}>
+          <h2 className={headingClass}>Bhagavad Gita</h2>
+          {tableError && <p className="mt-3 text-sm text-red-400">{tableError}</p>}
+          <QuotesTable rows={rows} onFavorite={favorite} onSaveBeats={saveBeats} />
+        </section>
 
-      <section className={panelClass}>
-        <h2 className={headingClass}>Bhagavad Gita</h2>
-        {tableError && <p className="mt-3 text-sm text-red-400">{tableError}</p>}
-        <QuotesTable rows={rows} onFavorite={favorite} onSaveBeats={saveBeats} />
-      </section>
+        <section className={panelClass}>
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <h2 className={headingClass}>Custom quotes</h2>
+            <span className="text-xs tabular-nums text-[#a89f8d]">{customQuotes.length} in sources/custom-quotes.json</span>
+          </div>
 
-      <section className={panelClass}>
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className={headingClass}>Custom quotes</h2>
-          <span className="text-xs tabular-nums text-[#a89f8d]">{customQuotes.length} in sources/custom-quotes.json</span>
-        </div>
-
-        {customQuotes.length === 0 ? (
-          <p className="mt-3 text-sm text-[#a89f8d]">
-            None yet — write one below and it joins the Studio&rsquo;s source list.
-          </p>
-        ) : (
-          <ul className="mt-3 space-y-3">
-            {customQuotes.map((q) => (
-              <li key={q.id} className="rounded-lg bg-[#0d0817] p-3 ring-1 ring-white/5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm text-[#f5efe0]">{q.lines.join(' · ')}</p>
-                    <p className="mt-1 text-xs text-[#a89f8d]">
-                      <span className="text-[#e8c874]">{q.kicker}</span> · {q.attribution}
-                    </p>
-                    <p className="mt-1 text-xs text-[#a89f8d]/70">
-                      {q.prompt
-                        ? `${q.prompt.slice(0, 90)}${q.prompt.length > 90 ? '…' : ''}`
-                        : 'no image prompt — generic theme fallback'}
-                    </p>
+          {customQuotes.length === 0 ? (
+            <p className="mt-3 text-sm text-[#a89f8d]">
+              None yet — write one below and it joins the Studio&rsquo;s source list.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-3">
+              {customQuotes.map((q) => (
+                <li key={q.id} className="rounded-lg bg-[#0d0817] p-3 ring-1 ring-white/5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm text-[#f5efe0]">{q.lines.join(' · ')}</p>
+                      <p className="mt-1 text-xs text-[#a89f8d]">
+                        <span className="text-[#e8c874]">{q.kicker}</span> · {q.attribution}
+                      </p>
+                      <p className="mt-1 text-xs text-[#a89f8d]/70">
+                        {q.prompt
+                          ? `${q.prompt.slice(0, 90)}${q.prompt.length > 90 ? '…' : ''}`
+                          : 'no image prompt — generic theme fallback'}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap items-center gap-2">
+                      <Link href={`/studio?ref=${encodeURIComponent(customRef(q.id))}`} className={ghostButtonClass}>
+                        Open in Studio
+                      </Link>
+                      <button
+                        type="button"
+                        aria-label={`edit ${q.id}`}
+                        className={`${iconButtonClass} px-2 py-1`}
+                        onClick={() => startEdit(q)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`delete ${q.id}`}
+                        className={`${iconButtonClass} px-2 py-1`}
+                        onClick={() => void remove(q)}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex shrink-0 flex-wrap items-center gap-2">
-                    <Link href={`/studio?ref=${encodeURIComponent(customRef(q.id))}`} className={ghostButtonClass}>
-                      Open in Studio
-                    </Link>
-                    <button
-                      type="button"
-                      aria-label={`edit ${q.id}`}
-                      className={`${iconButtonClass} px-2 py-1`}
-                      onClick={() => startEdit(q)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`delete ${q.id}`}
-                      className={`${iconButtonClass} px-2 py-1`}
-                      onClick={() => void remove(q)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+                </li>
+              ))}
+            </ul>
+          )}
 
-        <div className="mt-4">
-          <CustomQuoteForm
-            key={formKey}
-            editing={editing}
-            saving={savingQuote}
-            status={quoteStatus}
-            onSubmit={submitQuote}
-            onCancel={resetForm}
-          />
-        </div>
-      </section>
-    </main>
+          <div className="mt-4">
+            <CustomQuoteForm
+              key={formKey}
+              editing={editing}
+              saving={savingQuote}
+              status={quoteStatus}
+              onSubmit={submitQuote}
+              onCancel={resetForm}
+            />
+          </div>
+        </section>
+      </div>
+    </>
   );
 }

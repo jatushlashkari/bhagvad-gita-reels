@@ -14,6 +14,7 @@ import { promptFor } from '../../../shared/prompts.ts';
 import { DEFAULT_STYLE, type ReelStyle } from '../../../shared/reel-style.ts';
 import type { ReelProps, Verse } from '../../../shared/types.ts';
 import { AddToCalendar } from '../components/calendar/AddToCalendar.tsx';
+import { PageHeader } from '../components/shell/PageHeader.tsx';
 import { BeatsEditor, beatsProblem } from '../components/studio/BeatsEditor.tsx';
 import { MediaControls, ROTATION_NOTE, type Asset } from '../components/studio/MediaControls.tsx';
 import { StyleControls } from '../components/studio/StyleControls.tsx';
@@ -429,173 +430,169 @@ export default function StudioPage() {
     style.musicMode === 'rotation' ? ROTATION_NOTE : style.musicMode === 'track' && !style.musicFile ? 'no track selected — silent' : null;
 
   return (
-    <main className="mx-auto max-w-7xl space-y-6 px-4 py-8">
-      <header className="flex flex-wrap items-baseline justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-semibold text-[#e8c874]">Studio</h1>
-          <p className="text-sm text-[#a89f8d]">cinema format — live preview of the exact render</p>
-        </div>
-        <Link href="/" className="text-sm text-[#a89f8d] transition-colors hover:text-[#e8c874]">
-          ← Control room
-        </Link>
-      </header>
-
-      <section className={panelClass}>
-        <h2 className={headingClass}>Source</h2>
-        <div className={`mt-3 grid gap-3 ${source.kind === 'verse' ? 'sm:grid-cols-4' : 'sm:grid-cols-2'}`}>
-          <Field label="source">
-            <select
-              aria-label="source"
-              className={selectClass}
-              value={source.kind === 'verse' ? GITA_OPTION : ref}
-              onChange={(e) => selectSource(e.target.value)}
-            >
-              <option value={GITA_OPTION}>Bhagavad Gita</option>
-              {customQuotes.length > 0 && (
-                <optgroup label="Custom quotes">
-                  {customQuotes.map((q) => (
-                    <option key={q.id} value={customRef(q.id)}>
-                      {q.lines[0]}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-          </Field>
-
-          {source.kind === 'verse' ? (
-            <>
-              <Field label="chapter" hint="अध्याय">
-                <select
-                  aria-label="chapter"
-                  className={selectClass}
-                  value={source.ch}
-                  onChange={(e) => setSource({ kind: 'verse', ch: Number(e.target.value), vs: 1 })} // the new chapter may be shorter than the current verse number
-                >
-                  {Array.from({ length: chapters.length || 18 }, (_, i) => (
-                    <option key={i + 1} value={i + 1}>
-                      {i + 1}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="verse" hint="श्लोक">
-                <select
-                  aria-label="verse"
-                  className={selectClass}
-                  value={source.vs}
-                  onChange={(e) => setSource({ kind: 'verse', ch: source.ch, vs: Number(e.target.value) })}
-                >
-                  {Array.from({ length: verseCount }, (_, i) => (
-                    <option key={i + 1} value={i + 1}>
-                      {i + 1}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <div className="self-end text-sm">
-                <span className="mr-2 text-[#e8c874] tabular-nums">गीता {source.ch}.{source.vs}</span>
-                <span className={verse ? 'text-[#a89f8d]' : 'text-[#a89f8d]/40'}>{verse ? verse.hindi : '—'}</span>
-              </div>
-            </>
-          ) : (
-            <div className="self-end text-sm">
-              {quote ? (
-                <>
-                  <span className="mr-2 text-[#e8c874]">{quote.kicker}</span>
-                  <span className="text-[#a89f8d]">· {quote.attribution}</span>
-                </>
-              ) : (
-                <span className="text-[#a89f8d]/40">{customLoaded ? 'quote not found' : '—'}</span>
-              )}
-            </div>
-          )}
-        </div>
-        <p className="mt-3 text-xs text-[#a89f8d]">
-          <Link href="/quotes" className="text-[#e8c874] transition-colors hover:underline">
-            manage on /quotes
-          </Link>
-        </p>
-      </section>
-
-      <div className="grid gap-6 lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] lg:items-start">
-        <div className="lg:sticky lg:top-6">
-          <PreviewPane
-            inputProps={preview.props}
-            totalSec={preview.totalSec}
-            error={preview.error}
-            note={previewNote}
-          />
-        </div>
-
-        <div className="space-y-6">
-          <BeatsEditor
-            beats={beats}
-            curated={curated}
-            onChange={setBeats}
-            onSave={saveBeats}
-            saving={savingBeats}
-            status={beatsStatus}
-          />
-          <StyleControls
-            style={style}
-            onChange={patchStyle}
-            onSave={saveStyle}
-            saving={savingStyle}
-            saved={savedStyle}
-            error={styleError}
-          />
-          <MediaControls
-            assets={assets}
-            background={background}
-            onBackground={setBackground}
-            style={style}
-            prompt={prompt}
-            onChange={patchStyle}
-            onAssetsChanged={loadAssets}
-          />
-
-          <section className={panelClass}>
-            <h2 className={headingClass}>Render</h2>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                className={buttonClass}
-                disabled={running || problem !== null || preview.error !== null}
-                onClick={render}
+    <>
+      <PageHeader
+        title="Studio"
+        description="Live preview of the exact render — tune this cut before you render it."
+      />
+      <div className="space-y-6">
+        <section className={panelClass}>
+          <h2 className={headingClass}>Source</h2>
+          <div className={`mt-3 grid gap-3 ${source.kind === 'verse' ? 'sm:grid-cols-4' : 'sm:grid-cols-2'}`}>
+            <Field label="source">
+              <select
+                aria-label="source"
+                className={selectClass}
+                value={source.kind === 'verse' ? GITA_OPTION : ref}
+                onChange={(e) => selectSource(e.target.value)}
               >
-                {running ? 'Rendering…' : 'Render this cut'}
-              </button>
-              <span className="text-xs text-[#a89f8d]">
-                {problem ?? (running
-                  ? 'dry run — nothing is posted; takes a couple of minutes'
-                  : 'dry run — renders out/reel.mp4 with these unsaved edits')}
-              </span>
-            </div>
+                <option value={GITA_OPTION}>Bhagavad Gita</option>
+                {customQuotes.length > 0 && (
+                  <optgroup label="Custom quotes">
+                    {customQuotes.map((q) => (
+                      <option key={q.id} value={customRef(q.id)}>
+                        {q.lines[0]}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </Field>
 
-            {(log || running) && (
-              <pre
-                ref={logRef}
-                data-testid="render-log"
-                className="mt-4 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[#0d0817] p-3 font-mono text-[11px] leading-relaxed text-[#a89f8d] ring-1 ring-white/5"
-              >
-                {log || 'starting…'}
-              </pre>
-            )}
-            {done === true && renderedRef && (
+            {source.kind === 'verse' ? (
               <>
-                <ReelPlayer />
-                {/* Only after a successful render: "Add to calendar" schedules the cut now sitting
-                    in out/, so offering it before one exists would archive someone else's reel.
-                    `renderedRef`, not the live `ref` — see its declaration above — so a verse
-                    change right after rendering can't archive the old file under the new ref. */}
-                <AddToCalendar sourceRef={renderedRef} />
+                <Field label="chapter" hint="अध्याय">
+                  <select
+                    aria-label="chapter"
+                    className={selectClass}
+                    value={source.ch}
+                    onChange={(e) => setSource({ kind: 'verse', ch: Number(e.target.value), vs: 1 })} // the new chapter may be shorter than the current verse number
+                  >
+                    {Array.from({ length: chapters.length || 18 }, (_, i) => (
+                      <option key={i + 1} value={i + 1}>
+                        {i + 1}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="verse" hint="श्लोक">
+                  <select
+                    aria-label="verse"
+                    className={selectClass}
+                    value={source.vs}
+                    onChange={(e) => setSource({ kind: 'verse', ch: source.ch, vs: Number(e.target.value) })}
+                  >
+                    {Array.from({ length: verseCount }, (_, i) => (
+                      <option key={i + 1} value={i + 1}>
+                        {i + 1}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <div className="self-end text-sm">
+                  <span className="mr-2 text-[#e8c874] tabular-nums">गीता {source.ch}.{source.vs}</span>
+                  <span className={verse ? 'text-[#a89f8d]' : 'text-[#a89f8d]/40'}>{verse ? verse.hindi : '—'}</span>
+                </div>
               </>
+            ) : (
+              <div className="self-end text-sm">
+                {quote ? (
+                  <>
+                    <span className="mr-2 text-[#e8c874]">{quote.kicker}</span>
+                    <span className="text-[#a89f8d]">· {quote.attribution}</span>
+                  </>
+                ) : (
+                  <span className="text-[#a89f8d]/40">{customLoaded ? 'quote not found' : '—'}</span>
+                )}
+              </div>
             )}
-            {done === false && <p className="mt-3 text-sm text-red-400">failed — log above</p>}
-          </section>
+          </div>
+          <p className="mt-3 text-xs text-[#a89f8d]">
+            <Link href="/quotes" className="text-[#e8c874] transition-colors hover:underline">
+              manage on /quotes
+            </Link>
+          </p>
+        </section>
+
+        <div className="grid gap-6 lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] lg:items-start">
+          <div className="lg:sticky lg:top-6">
+            <PreviewPane
+              inputProps={preview.props}
+              totalSec={preview.totalSec}
+              error={preview.error}
+              note={previewNote}
+            />
+          </div>
+
+          <div className="space-y-6">
+            <BeatsEditor
+              beats={beats}
+              curated={curated}
+              onChange={setBeats}
+              onSave={saveBeats}
+              saving={savingBeats}
+              status={beatsStatus}
+            />
+            <StyleControls
+              style={style}
+              onChange={patchStyle}
+              onSave={saveStyle}
+              saving={savingStyle}
+              saved={savedStyle}
+              error={styleError}
+            />
+            <MediaControls
+              assets={assets}
+              background={background}
+              onBackground={setBackground}
+              style={style}
+              prompt={prompt}
+              onChange={patchStyle}
+              onAssetsChanged={loadAssets}
+            />
+
+            <section className={panelClass}>
+              <h2 className={headingClass}>Render</h2>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  className={buttonClass}
+                  disabled={running || problem !== null || preview.error !== null}
+                  onClick={render}
+                >
+                  {running ? 'Rendering…' : 'Render this cut'}
+                </button>
+                <span className="text-xs text-[#a89f8d]">
+                  {problem ?? (running
+                    ? 'dry run — nothing is posted; takes a couple of minutes'
+                    : 'dry run — renders out/reel.mp4 with these unsaved edits')}
+                </span>
+              </div>
+
+              {(log || running) && (
+                <pre
+                  ref={logRef}
+                  data-testid="render-log"
+                  className="mt-4 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[#0d0817] p-3 font-mono text-[11px] leading-relaxed text-[#a89f8d] ring-1 ring-white/5"
+                >
+                  {log || 'starting…'}
+                </pre>
+              )}
+              {done === true && renderedRef && (
+                <>
+                  <ReelPlayer />
+                  {/* Only after a successful render: "Add to calendar" schedules the cut now sitting
+                      in out/, so offering it before one exists would archive someone else's reel.
+                      `renderedRef`, not the live `ref` — see its declaration above — so a verse
+                      change right after rendering can't archive the old file under the new ref. */}
+                  <AddToCalendar sourceRef={renderedRef} />
+                </>
+              )}
+              {done === false && <p className="mt-3 text-sm text-red-400">failed — log above</p>}
+            </section>
+          </div>
         </div>
       </div>
-    </main>
+    </>
   );
 }

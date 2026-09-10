@@ -1,4 +1,5 @@
 import './globals.css';
+import { Sidebar } from './components/shell/Sidebar.tsx';
 
 export const metadata = { title: 'Gita Reels' };
 
@@ -13,7 +14,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      <body className="min-h-screen bg-bg text-fg antialiased">{children}</body>
+      <body className="min-h-screen bg-bg text-fg antialiased">
+        <div className="min-h-screen md:flex">
+          <Sidebar />
+          <main className="mx-auto min-w-0 w-full max-w-7xl px-4 py-6 lg:px-8 lg:py-8">{children}</main>
+        </div>
+      </body>
     </html>
   );
 }

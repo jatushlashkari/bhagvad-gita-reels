@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { sortItems, type Platform, type ScheduleItem } from '../../../shared/schedule.ts';
 import type { CalendarView, PostPatch } from '../../lib/backend.ts';
 import { BUSY, CalendarTable } from '../components/calendar/CalendarTable.tsx';
+import { PageHeader } from '../components/shell/PageHeader.tsx';
 import { headingClass, panelClass } from '../components/studio/ui.tsx';
 
 /** Same reader as GeneratePanel's, the Studio's and the Quotes page's: the routes answer
@@ -103,75 +104,61 @@ export default function CalendarPage() {
   }
 
   return (
-    <main className="mx-auto max-w-7xl space-y-6 px-4 py-8">
-      <header className="flex flex-wrap items-baseline justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-semibold text-[#e8c874]">Calendar</h1>
-          <p className="text-sm text-[#a89f8d]">
-            every scheduled post, in {view ? view.config.timezone : 'the configured timezone'}
-          </p>
-        </div>
-        <div className="flex gap-4">
-          <Link href="/" className="text-sm text-[#a89f8d] transition-colors hover:text-[#e8c874]">
-            ← Control room
-          </Link>
-          <Link href="/studio" className="text-sm text-[#a89f8d] transition-colors hover:text-[#e8c874]">
-            Studio →
-          </Link>
-        </div>
-      </header>
-
-      <section className={panelClass}>
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className={headingClass}>Scheduled</h2>
-          {view && (
-            <span className="flex items-center gap-2 text-xs text-[#a89f8d]">
-              <span
-                data-mode={view.mode}
-                className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-[0.14em] ring-1 ${
-                  view.mode === 'calendar' ? 'text-[#e8c874] ring-[#e8c874]/30' : 'text-[#a89f8d] ring-white/10'
-                }`}
-              >
-                {view.mode} mode
+    <>
+      <PageHeader title="Calendar" description="What goes out, where, and when." />
+      <div className="space-y-6">
+        <section className={panelClass}>
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <h2 className={headingClass}>Scheduled</h2>
+            {view && (
+              <span className="flex items-center gap-2 text-xs text-[#a89f8d]">
+                <span
+                  data-mode={view.mode}
+                  className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-[0.14em] ring-1 ${
+                    view.mode === 'calendar' ? 'text-[#e8c874] ring-[#e8c874]/30' : 'text-[#a89f8d] ring-white/10'
+                  }`}
+                >
+                  {view.mode} mode
+                </span>
+                <span className="tabular-nums">{view.items.length} in schedule.json</span>
               </span>
-              <span className="tabular-nums">{view.items.length} in schedule.json</span>
-            </span>
+            )}
+          </div>
+
+          {/* Worth saying out loud: in daily mode the hourly workflow is switched off, so rows here
+              sit untouched until config.json's `mode` says calendar. */}
+          {view?.mode === 'daily' && (
+            <p className="mt-3 text-sm text-[#e8c874]/80">
+              config.json is in daily mode — the hourly publisher does not run, so nothing below goes out on its own.
+            </p>
           )}
-        </div>
 
-        {/* Worth saying out loud: in daily mode the hourly workflow is switched off, so rows here
-            sit untouched until config.json's `mode` says calendar. */}
-        {view?.mode === 'daily' && (
-          <p className="mt-3 text-sm text-[#e8c874]/80">
-            config.json is in daily mode — the hourly publisher does not run, so nothing below goes out on its own.
-          </p>
-        )}
+          {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
 
-        {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+          {view && view.items.length === 0 && (
+            <p className="mt-3 text-sm text-[#a89f8d]">
+              Nothing scheduled — the hourly publisher fills the next {view.config.daysAhead} days, or add a reel from{' '}
+              <Link href="/studio" className="text-[#e8c874] transition-colors hover:underline">
+                Studio
+              </Link>
+              .
+            </p>
+          )}
 
-        {view && view.items.length === 0 && (
-          <p className="mt-3 text-sm text-[#a89f8d]">
-            Nothing scheduled — the hourly publisher fills the next {view.config.daysAhead} days, or add a reel from{' '}
-            <Link href="/studio" className="text-[#e8c874] transition-colors hover:underline">
-              Studio
-            </Link>
-            .
-          </p>
-        )}
+          {view && view.items.length > 0 && (
+            <CalendarTable
+              items={view.items}
+              config={view.config}
+              secrets={view.secrets}
+              onPatch={patchPost}
+              onDelete={deleteItem}
+              onReload={() => void load()}
+            />
+          )}
 
-        {view && view.items.length > 0 && (
-          <CalendarTable
-            items={view.items}
-            config={view.config}
-            secrets={view.secrets}
-            onPatch={patchPost}
-            onDelete={deleteItem}
-            onReload={() => void load()}
-          />
-        )}
-
-        {!view && !error && <p className="mt-3 text-sm text-[#a89f8d]">loading…</p>}
-      </section>
-    </main>
+          {!view && !error && <p className="mt-3 text-sm text-[#a89f8d]">loading…</p>}
+        </section>
+      </div>
+    </>
   );
 }
