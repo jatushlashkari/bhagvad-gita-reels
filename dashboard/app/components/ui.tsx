@@ -17,6 +17,10 @@ export const iconButtonClass =
 export const rangeClass = 'mt-1 w-full accent-accent';
 export const labelClass = 'text-[10px] uppercase tracking-[0.18em] text-muted';
 
+/** The one wording for "something else holds the render lock" — CalendarTable's `BUSY` and the
+ *  settings cards' 409 handling both point at this, so the sentence never drifts between them. */
+export const BUSY_MESSAGE = 'a render or the publisher is running — try again in a moment';
+
 export function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <label className="block">

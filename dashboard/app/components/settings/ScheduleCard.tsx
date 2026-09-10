@@ -1,7 +1,8 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PLATFORMS } from '../../../../shared/schedule.ts';
 import { validateConfigPatch, type ConfigView } from '../../../../shared/config.ts';
+import { BUSY_MESSAGE } from '../ui.tsx';
 import { SettingsCard } from './SettingsCard.tsx';
 import { NumberField, SelectField, TimeField } from './fields.tsx';
 
@@ -22,7 +23,6 @@ export function ScheduleCard({ config, onSaved }: { config: ConfigView; onSaved:
   const [error, setError] = useState<string | null>(null);
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
-  useEffect(() => setDraft(config.schedule), [config.schedule]);
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(config.schedule);
   const localErrors = useMemo(() => {
@@ -31,6 +31,19 @@ export function ScheduleCard({ config, onSaved }: { config: ConfigView; onSaved:
     return r.ok ? {} : r.errors;
   }, [draft, dirty]);
   const errors = { ...localErrors, ...serverErrors };
+
+  // A save from the *sibling* card also replaces `config` (same `setConfig` in the page), which
+  // would otherwise stomp an unsaved edit here just because a fresh object arrived. Only resync
+  // when this card has nothing of its own pending.
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  useEffect(() => {
+    if (!dirtyRef.current) setDraft(config.schedule);
+  }, [config.schedule]);
+
+  // A stale server error (from a prior failed save) must not survive the next edit — otherwise
+  // fixing the field back to the current config value disables Save and leaves the message stuck.
+  useEffect(() => setServerErrors({}), [draft]);
 
   async function save() {
     setSaving(true);
@@ -44,11 +57,14 @@ export function ScheduleCard({ config, onSaved }: { config: ConfigView; onSaved:
       });
       const body = (await res.json().catch(() => ({}))) as { errors?: Record<string, string>; error?: string } & Partial<ConfigView>;
       if (!res.ok) {
-        if (body.errors) setServerErrors(body.errors);
+        if (res.status === 409) setError(BUSY_MESSAGE);
+        else if (body.errors) setServerErrors(body.errors);
         else setError(body.error ?? `save failed (${res.status})`);
         return;
       }
-      onSaved(body as ConfigView);
+      const next = body as ConfigView;
+      onSaved(next);
+      setDraft(next.schedule);
       setSaved(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'save failed');
@@ -65,6 +81,7 @@ export function ScheduleCard({ config, onSaved }: { config: ConfigView; onSaved:
       saving={saving}
       error={error}
       saved={saved}
+      invalid={Object.keys(errors).length > 0}
       onSave={save}
     >
       <div className="grid gap-4 sm:grid-cols-2">

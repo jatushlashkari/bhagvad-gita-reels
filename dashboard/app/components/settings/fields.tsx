@@ -86,7 +86,7 @@ export function SelectField({
         {label}
         {hint && <span className="ml-1 tracking-normal text-muted">{hint}</span>}
       </span>
-      <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className={`mt-1 ${selectClass}`}>
+      <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className={`mt-1 ${selectClass} ${error ? 'border-danger' : ''}`}>
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}

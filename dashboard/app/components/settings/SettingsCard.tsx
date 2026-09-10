@@ -10,6 +10,7 @@ export function SettingsCard({
   saving,
   error,
   saved,
+  invalid,
   onSave,
   children,
 }: {
@@ -19,6 +20,7 @@ export function SettingsCard({
   saving: boolean;
   error: string | null;
   saved: boolean;
+  invalid: boolean;
   onSave: () => void;
   children: React.ReactNode;
 }) {
@@ -32,7 +34,7 @@ export function SettingsCard({
       {description && <p className="mt-1 text-sm text-muted">{description}</p>}
       <div className="mt-4 space-y-4">{children}</div>
       <div className="mt-5 flex items-center gap-3">
-        <button type="button" className={buttonClass} disabled={!dirty || saving} onClick={onSave}>
+        <button type="button" className={buttonClass} disabled={!dirty || saving || invalid} onClick={onSave}>
           {saving ? 'Saving…' : 'Save'}
         </button>
         {error && <span className="text-sm text-danger">{error}</span>}

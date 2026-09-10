@@ -10,14 +10,15 @@ import {
   type ScheduleItem,
 } from '../../../../shared/schedule.ts';
 import type { PostPatch } from '../../../lib/backend.ts';
-import { iconButtonClass, labelClass, selectClass } from '../ui.tsx';
+import { BUSY_MESSAGE, iconButtonClass, labelClass, selectClass } from '../ui.tsx';
 import { PostDrawer } from './PostDrawer.tsx';
 
 /** Every 409 from the calendar routes means one thing to whoever is looking at the table:
  *  something else holds the render lock. The server says "publisher running" even when the holder
  *  is a Studio render, so the UI restates it as what to do about it. Exported because the page's
- *  PATCH/DELETE answer the same 409 and two drifting sentences would be worse than one import. */
-export const BUSY = 'a render or the publisher is running — try again in a moment';
+ *  PATCH/DELETE answer the same 409 and two drifting sentences would be worse than one import.
+ *  Re-exported from `BUSY_MESSAGE` so the settings cards' 409 handling uses the same sentence. */
+export const BUSY = BUSY_MESSAGE;
 
 /** Exactly what the disabled "Publish now" says: without local credentials this machine cannot
  *  post at all, but the hourly GitHub workflow still will, at the time in the row. */
